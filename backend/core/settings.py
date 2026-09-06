@@ -1,5 +1,6 @@
 import os
 import sys
+import urllib.parse
 from pathlib import Path
 from datetime import timedelta
 import dj_database_url
@@ -88,7 +89,25 @@ ASGI_APPLICATION = 'core.asgi.application'
 # Database configuration
 # Uses DATABASE_URL for Postgres in Production (e.g. Supabase, Render, Railway)
 # Fallbacks to local SQLite for instant dev
-DATABASE_URL = os.getenv('DATABASE_URL')
+def sanitize_db_url(url):
+    if not url:
+        return url
+    url = url.strip().strip('"\'')
+    if '://' in url:
+        proto, rest = url.split('://', 1)
+        if '@' in rest:
+            creds, host_part = rest.rsplit('@', 1)
+            if ':' in creds:
+                user, pwd = creds.split(':', 1)
+                # Unquote first to prevent double-encoding, then URL-encode safely
+                user = urllib.parse.unquote(user)
+                pwd = urllib.parse.unquote(pwd)
+                quoted_user = urllib.parse.quote(user, safe='')
+                quoted_pwd = urllib.parse.quote(pwd, safe='')
+                return f"{proto}://{quoted_user}:{quoted_pwd}@{host_part}"
+    return url
+
+DATABASE_URL = sanitize_db_url(os.getenv('DATABASE_URL'))
 if DATABASE_URL:
     is_supabase = 'supabase' in DATABASE_URL.lower()
     DATABASES = {
