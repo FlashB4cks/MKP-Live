@@ -9,11 +9,20 @@ admin.site.index_title = "Panel de Control MKP Live"
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Standard API endpoints with /api/ prefix
     path('api/auth/', include('accounts.urls')),
     path('api/servers/', include('servers.urls')),
     path('api/channels/', include('channels_app.urls')),
     path('api/chat/', include('chat.urls')),
     path('api/sessions/', include('virtual_sessions.urls')),
+
+    # Root aliases (allows client requests with or without /api/ prefix)
+    path('auth/', include('accounts.urls')),
+    path('servers/', include('servers.urls')),
+    path('channels/', include('channels_app.urls')),
+    path('chat/', include('chat.urls')),
+    path('sessions/', include('virtual_sessions.urls')),
 ]
 
 if settings.DEBUG:
