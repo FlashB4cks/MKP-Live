@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from '../../store/authStore';
 import { useSessionStore } from '../../store/sessionStore';
 import ScreenShareModal from './ScreenShareModal';
+import ConfirmModal from '../modals/ConfirmModal';
 import api from '../../api/client';
 
 const ICE_SERVERS = {
@@ -157,7 +158,7 @@ function RemoteParticipantCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onHostKick?.(participant.user_id);
+              onHostKick?.(participant.user_id, participant.username);
             }}
             className="p-1 rounded text-discord-red hover:text-white hover:bg-discord-red transition"
             title="Expulsar de la reunión"
@@ -414,6 +415,10 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const [screenAudioVolume, setScreenAudioVolume] = useState(1);
   const [isPresenterAudioMuted, setIsPresenterAudioMuted] = useState(false);
 
+  // Moderation Modals
+  const [participantToKick, setParticipantToKick] = useState(null); // { user_id, username }
+  const [kickedNoticeOpen, setKickedNoticeOpen] = useState(false);
+
   const localScreenStreamRef = useRef(null);
   const screenSendersRef = useRef({});
   const activeScreenShareRef = useRef(activeScreenShare);
@@ -556,20 +561,28 @@ export default function VirtualSessionRoom({ session, onLeave }) {
     moderateParticipant(session.id, targetUserId, 'DISABLE_VIDEO');
   };
 
-  const handleHostKick = async (targetUserId) => {
-    if (window.confirm('¿Estás seguro de que deseas expulsar a este participante de la reunión?')) {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(
-          JSON.stringify({
-            type: 'host_kick_participant',
-            target_user_id: String(targetUserId),
-          })
-        );
-      }
-      moderateParticipant(session.id, targetUserId, 'KICK');
-      closePeerConnection(targetUserId);
-      setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(targetUserId)));
+  const handleHostKick = (targetUserId, targetUsername = 'este participante') => {
+    setParticipantToKick({
+      user_id: targetUserId,
+      username: targetUsername,
+    });
+  };
+
+  const confirmHostKick = async () => {
+    if (!participantToKick) return;
+    const targetUserId = participantToKick.user_id;
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'host_kick_participant',
+          target_user_id: String(targetUserId),
+        })
+      );
     }
+    moderateParticipant(session.id, targetUserId, 'KICK');
+    closePeerConnection(targetUserId);
+    setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(targetUserId)));
+    setParticipantToKick(null);
   };
 
   // Screen Share Actions
@@ -1329,8 +1342,14 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             }
           } else if (data.event_type === 'host_forced_kick') {
             if (String(data.target_user_id) === String(user?.id)) {
-              alert('Has sido expulsado de la reunión por el anfitrión.');
-              handleEndOrLeave();
+              setIsMinimized(false);
+              if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach((t) => t.stop());
+              }
+              if (localScreenStreamRef.current) {
+                localScreenStreamRef.current.getTracks().forEach((t) => t.stop());
+              }
+              setKickedNoticeOpen(true);
             } else {
               closePeerConnection(data.target_user_id);
               setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(data.target_user_id)));
@@ -1494,6 +1513,33 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       }
     }
   };
+
+  // If user was kicked by the host, show custom kicked modal directly
+  if (kickedNoticeOpen) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 select-none animate-in fade-in">
+        <div className="relative w-full max-w-md rounded-2xl bg-discord-chat p-6 sm:p-8 shadow-2xl border border-discord-red/40 text-center animate-in zoom-in-95">
+          <div className="w-16 h-16 mx-auto rounded-full bg-discord-red/20 text-discord-red flex items-center justify-center mb-4 shadow-inner">
+            <UserX className="w-8 h-8 sm:w-9 sm:h-9" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Expulsado de la reunión</h2>
+          <p className="text-sm text-discord-text-muted mb-6 leading-relaxed">
+            Has sido expulsado de la reunión por el anfitrión.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setKickedNoticeOpen(false);
+              handleEndOrLeave();
+            }}
+            className="w-full rounded-xl px-5 py-3 text-sm font-bold text-white bg-discord-red hover:bg-discord-red/90 active:scale-98 transition shadow-lg"
+          >
+            Aceptar y salir
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ==========================================
   // MODE 1: MINIMIZED FLOATING WINDOW (Picture-in-Picture)
@@ -2216,7 +2262,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
                                 <VideoOff className="w-3 h-3" />
                               </button>
                               <button
-                                onClick={() => handleHostKick(p.user_id)}
+                                onClick={() => handleHostKick(p.user_id, p.username)}
                                 className="p-1 rounded text-discord-red hover:text-white hover:bg-discord-red transition"
                                 title="Expulsar de la reunión"
                               >
@@ -2376,6 +2422,17 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         isOpen={isScreenModalOpen}
         onClose={() => setIsScreenModalOpen(false)}
         onStart={startScreenShare}
+      />
+
+      {/* Host Kick Participant Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!participantToKick}
+        onClose={() => setParticipantToKick(null)}
+        onConfirm={confirmHostKick}
+        title="Expulsar participante"
+        message={`¿Estás seguro de que deseas expulsar a @${participantToKick?.username || 'este participante'} de la reunión? No podrá volver a ingresar a menos que vuelva a solicitar acceso y tú lo apruebes.`}
+        confirmText="Expulsar de la reunión"
+        danger={true}
       />
     </div>
   );

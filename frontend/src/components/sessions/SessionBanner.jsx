@@ -4,6 +4,7 @@ import { useSessionStore } from '../../store/sessionStore';
 import { useAuthStore } from '../../store/authStore';
 import ScheduleSessionModal from './ScheduleSessionModal';
 import WaitingRoomModal from './WaitingRoomModal';
+import ConfirmModal from '../modals/ConfirmModal';
 
 export default function SessionBanner({ serverId }) {
   const user = useAuthStore((state) => state.user);
@@ -19,6 +20,7 @@ export default function SessionBanner({ serverId }) {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [waitingSession, setWaitingSession] = useState(null);
   const [loadingAction, setLoadingAction] = useState(false);
+  const [sessionToCancel, setSessionToCancel] = useState(null);
 
   useEffect(() => {
     if (serverId) {
@@ -67,11 +69,15 @@ export default function SessionBanner({ serverId }) {
     }
   };
 
-  const handleDeleteSession = async (sessionId, e) => {
+  const handleDeleteSession = (sessionItem, e) => {
     e.stopPropagation();
-    if (confirm('¿Estás seguro de que deseas cancelar esta sesión programada?')) {
-      await deleteSession(sessionId);
-    }
+    setSessionToCancel(sessionItem);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToCancel) return;
+    await deleteSession(sessionToCancel.id);
+    setSessionToCancel(null);
   };
 
   const activeSessions = sessions.filter((s) => s.status === 'ACTIVE');
@@ -210,7 +216,7 @@ export default function SessionBanner({ serverId }) {
                         <span>Iniciar ahora</span>
                       </button>
                       <button
-                        onClick={(e) => handleDeleteSession(session.id, e)}
+                        onClick={(e) => handleDeleteSession(session, e)}
                         className="p-1.5 text-discord-text-muted hover:text-discord-red transition rounded"
                         title="Cancelar sesión programada"
                       >
@@ -258,6 +264,17 @@ export default function SessionBanner({ serverId }) {
           }}
         />
       )}
+
+      {/* Cancel Scheduled Session Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!sessionToCancel}
+        onClose={() => setSessionToCancel(null)}
+        onConfirm={confirmDeleteSession}
+        title="Cancelar reunión programada"
+        message={`¿Estás seguro de que deseas cancelar la reunión "${sessionToCancel?.title || 'Programada'}"?`}
+        confirmText="Cancelar Reunión"
+        danger={true}
+      />
     </div>
   );
 }

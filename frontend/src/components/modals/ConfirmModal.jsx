@@ -14,8 +14,8 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="relative w-full max-w-md rounded-lg bg-discord-chat p-6 shadow-2xl border border-black/30">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="relative w-full max-w-md rounded-2xl bg-discord-chat p-6 shadow-2xl border border-white/10">
         <button
           onClick={onClose}
           disabled={loading}
