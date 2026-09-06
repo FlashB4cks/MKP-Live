@@ -1,0 +1,128 @@
+import React, { useState } from 'react';
+import { Plus, Compass, MessageSquare } from 'lucide-react';
+import { useServerStore } from '../../store/serverStore';
+import CreateServerModal from '../modals/CreateServerModal';
+import JoinServerModal from '../modals/JoinServerModal';
+
+export default function ServerSidebar() {
+  const servers = useServerStore((state) => state.servers);
+  const activeServer = useServerStore((state) => state.activeServer);
+  const selectServer = useServerStore((state) => state.selectServer);
+  const setDMView = useServerStore((state) => state.setDMView);
+  const isDMView = useServerStore((state) => state.isDMView);
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isJoinOpen, setIsJoinOpen] = useState(false);
+
+  const isDMsActive = !activeServer || isDMView;
+
+  return (
+    <aside className="w-[72px] flex-shrink-0 bg-discord-sidebar flex flex-col items-center py-3 space-y-2 select-none z-20">
+      {/* Direct Messages / Discord Home Button */}
+      <div className="relative group flex items-center justify-center w-full">
+        {/* Indicator Pill */}
+        <div
+          className={`absolute left-0 w-1 bg-white rounded-r-full transition-all duration-200 ${
+            isDMsActive ? 'h-10' : 'h-0 group-hover:h-5'
+          }`}
+        />
+        <button
+          onClick={() => setDMView()}
+          className={`w-12 h-12 rounded-[24px] group-hover:rounded-[16px] flex items-center justify-center transition-all duration-200 ${
+            isDMsActive
+              ? 'bg-discord-blurple rounded-[16px] text-white'
+              : 'bg-discord-chat hover:bg-discord-blurple text-discord-text hover:text-white'
+          }`}
+          title="MKP Live - Mensajes Directos"
+        >
+          <MessageSquare className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Separator */}
+      <div className="w-8 h-[2px] bg-discord-chat rounded-full my-1" />
+
+      {/* Server List */}
+      <div className="flex-1 w-full flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden no-scrollbar">
+        {servers.map((server) => {
+          const isActive = activeServer?.id === server.id;
+          const initials = server.name
+            .split(' ')
+            .map((n) => n[0])
+            .join('')
+            .slice(0, 3)
+            .toUpperCase();
+
+          return (
+            <div
+              key={server.id}
+              className="relative group flex items-center justify-center w-full"
+            >
+              {/* Active / Hover Pill Indicator */}
+              <div
+                className={`absolute left-0 w-1 bg-white rounded-r-full transition-all duration-200 ${
+                  isActive ? 'h-10' : 'h-0 group-hover:h-5'
+                }`}
+              />
+
+              <button
+                onClick={() => selectServer(server)}
+                className={`w-12 h-12 flex items-center justify-center transition-all duration-200 font-semibold overflow-hidden ${
+                  isActive
+                    ? 'rounded-[16px] bg-discord-blurple text-white shadow-lg'
+                    : 'rounded-[24px] hover:rounded-[16px] bg-discord-chat hover:bg-discord-blurple text-discord-text hover:text-white'
+                }`}
+                title={server.name}
+              >
+                {server.icon_url ? (
+                  <img
+                    src={server.icon_url}
+                    alt={server.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-sm font-bold tracking-tight">
+                    {initials}
+                  </span>
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Add Server Button */}
+      <div className="relative group flex items-center justify-center w-full">
+        <div className="absolute left-0 w-1 bg-white rounded-r-full transition-all duration-200 h-0 group-hover:h-5" />
+        <button
+          onClick={() => setIsCreateOpen(true)}
+          className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-discord-chat hover:bg-discord-green text-discord-green hover:text-white flex items-center justify-center transition-all duration-200"
+          title="Añadir un servidor"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Explore / Join Server Button */}
+      <div className="relative group flex items-center justify-center w-full">
+        <div className="absolute left-0 w-1 bg-white rounded-r-full transition-all duration-200 h-0 group-hover:h-5" />
+        <button
+          onClick={() => setIsJoinOpen(true)}
+          className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-discord-chat hover:bg-discord-green text-discord-green hover:text-white flex items-center justify-center transition-all duration-200"
+          title="Unirse a un servidor"
+        >
+          <Compass className="w-6 h-6" />
+        </button>
+      </div>
+
+      <CreateServerModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+      />
+      <JoinServerModal
+        isOpen={isJoinOpen}
+        onClose={() => setIsJoinOpen(false)}
+      />
+    </aside>
+  );
+}
