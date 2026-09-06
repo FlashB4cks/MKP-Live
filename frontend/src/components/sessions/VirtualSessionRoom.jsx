@@ -1513,10 +1513,35 @@ export default function VirtualSessionRoom({ session, onLeave }) {
     }
   };
 
-  const handleEndOrLeave = async () => {
+  const handleEndOrLeave = () => {
     setIsMinimized(false);
 
-    // 1. Notify WebSocket immediately
+    // 1. Immediately stop all local media tracks (camera, microphone, screen)
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {}
+      });
+      localStreamRef.current = null;
+    }
+    if (stream) {
+      stream.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {}
+      });
+    }
+    if (localScreenStreamRef.current) {
+      localScreenStreamRef.current.getTracks().forEach((track) => {
+        try {
+          track.stop();
+        } catch (e) {}
+      });
+      localScreenStreamRef.current = null;
+    }
+
+    // 2. Notify WebSocket immediately before closing
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
         wsRef.current.send(
@@ -1528,42 +1553,39 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       } catch (e) {}
     }
 
-    // 2. Call backend leave or end session endpoint
-    if (isHost) {
-      try {
-        await endSession(session.id);
-      } catch (err) {
-        console.warn('Error ending session:', err);
-      }
-    } else {
-      try {
-        await api.post(`/sessions/${session.id}/leave/`);
-      } catch (err) {
-        console.warn('Error leaving session:', err);
-      }
-    }
-
     // 3. Close peer connections
     Object.keys(peerConnectionsRef.current).forEach((peerId) => {
-      closePeerConnection(peerId);
+      try {
+        closePeerConnection(peerId);
+      } catch (e) {}
     });
 
-    // 4. Stop media tracks
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-    }
-    if (localScreenStreamRef.current) {
-      localScreenStreamRef.current.getTracks().forEach((track) => track.stop());
-      localScreenStreamRef.current = null;
-    }
-
-    // 5. Close WS
+    // 4. Close WebSocket
     if (wsRef.current) {
-      wsRef.current.close();
+      try {
+        wsRef.current.close();
+      } catch (e) {}
     }
 
-    leaveActiveSession(session.id);
-    onLeave();
+    // 5. Notify backend in the background (non-blocking)
+    if (isHost) {
+      endSession(session.id).catch((err) => {
+        console.warn('Error ending session:', err);
+      });
+    } else {
+      api.post(`/sessions/${session.id}/leave/`).catch((err) => {
+        console.warn('Error reporting leave to API:', err);
+      });
+    }
+
+    // 6. Unmount room cleanly via onLeave
+    if (typeof onLeave === 'function') {
+      try {
+        onLeave();
+      } catch (e) {
+        console.warn('onLeave error:', e);
+      }
+    }
   };
 
   // Ensure server knows if participant abruptly closes tab or window

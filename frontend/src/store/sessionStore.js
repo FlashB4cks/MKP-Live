@@ -209,15 +209,13 @@ export const useSessionStore = create((set, get) => ({
     }
   },
 
-  leaveActiveSession: async (sessionId) => {
+  leaveActiveSession: (sessionId) => {
     localStorage.removeItem('active_session_id');
-    if (sessionId) {
-      try {
-        await api.post(`/sessions/${sessionId}/leave/`);
-      } catch (err) {
-        console.warn('Error reporting leave session:', err);
-      }
-    }
     set({ activeSession: null, sessionDetails: null, isMinimized: false });
+    if (sessionId) {
+      api.post(`/sessions/${sessionId}/leave/`).catch((err) => {
+        console.warn('Error reporting leave session:', err);
+      });
+    }
   },
 }));

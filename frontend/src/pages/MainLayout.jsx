@@ -157,7 +157,7 @@ export default function MainLayout() {
       {activeSession && (
         <VirtualSessionRoom
           session={activeSession}
-          onLeave={leaveActiveSession}
+          onLeave={() => leaveActiveSession(activeSession?.id)}
         />
       )}
     </div>
