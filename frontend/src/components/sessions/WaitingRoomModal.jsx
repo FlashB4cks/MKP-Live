@@ -36,12 +36,12 @@ export default function WaitingRoomModal({ isOpen, onLeave, session, onApproved 
         if (data.type === 'session_event') {
           if (
             data.event_type === 'participant_approved' &&
-            (!data.user_id || data.user_id === user?.id)
+            (!data.user_id || String(data.user_id) === String(user?.id))
           ) {
             handleEnterSession();
           } else if (
             data.event_type === 'participant_rejected' &&
-            data.user_id === user?.id
+            String(data.user_id) === String(user?.id)
           ) {
             setRejected(true);
           }

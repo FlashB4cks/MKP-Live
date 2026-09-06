@@ -147,7 +147,7 @@ export const useSessionStore = create((set, get) => ({
       set((state) => {
         if (!state.sessionDetails) return state;
         const updatedList = (state.sessionDetails.participants || []).map((p) =>
-          p.user.id === userId ? updatedParticipant : p
+          String(p.user.id) === String(userId) ? updatedParticipant : p
         );
         return {
           sessionDetails: { ...state.sessionDetails, participants: updatedList },

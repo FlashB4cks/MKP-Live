@@ -71,6 +71,8 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
             if action == 'signal':
                 # Relay WebRTC signaling (offer, answer, candidate)
                 target_user_id = data.get('target_user_id')
+                if target_user_id is not None:
+                    target_user_id = str(target_user_id)
                 await self.channel_layer.group_send(
                     self.session_group_name,
                     {
@@ -125,7 +127,7 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                     {
                         'type': 'session_event',
                         'event_type': 'participant_approved' if status_action == 'ACCEPTED' else 'participant_rejected',
-                        'user_id': target_user_id,
+                        'user_id': str(target_user_id),
                         'username': target_username or 'Participante',
                         'status': status_action,
                     }
@@ -154,14 +156,20 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
     async def webrtc_signal_forward(self, event):
         # Only send to specific target or broadcast if target is null
         target = event.get('target_user_id')
-        if not target or target == str(self.user.id):
-            if event.get('from_user_id') != str(self.user.id):
-                await self.send(text_data=json.dumps({
-                    'type': 'signal',
-                    'from_user_id': event['from_user_id'],
-                    'from_username': event['from_username'],
-                    'signal_data': event['signal_data'],
-                }))
+        my_id = str(self.user.id)
+        from_id = str(event.get('from_user_id', ''))
+
+        # Never send signal back to the sender
+        if from_id == my_id:
+            return
+
+        if not target or str(target) == my_id:
+            await self.send(text_data=json.dumps({
+                'type': 'signal',
+                'from_user_id': from_id,
+                'from_username': event.get('from_username', ''),
+                'signal_data': event.get('signal_data'),
+            }))
 
     @database_sync_to_async
     def update_media_state(self, session_id, user_id, is_audio_muted, is_video_off):
