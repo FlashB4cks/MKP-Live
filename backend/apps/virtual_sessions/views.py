@@ -297,3 +297,57 @@ class SessionMessagesView(APIView):
 
         return Response(data, status=status.HTTP_201_CREATED)
 
+class ModerateParticipantView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk, user_id):
+        session = get_object_or_404(VirtualSession, pk=pk)
+        if session.host != request.user:
+            return Response(
+                {"detail": "Solo el anfitrión puede moderar a los participantes."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        participant = get_object_or_404(SessionParticipant, session=session, user_id=user_id)
+        action = request.data.get('action', '').upper()
+
+        channel_layer = get_channel_layer()
+
+        if action == 'MUTE':
+            participant.is_audio_muted = True
+            participant.save(update_fields=['is_audio_muted', 'updated_at'])
+            event_type = 'host_forced_mute'
+        elif action == 'DISABLE_VIDEO':
+            participant.is_video_off = True
+            participant.save(update_fields=['is_video_off', 'updated_at'])
+            event_type = 'host_forced_video_off'
+        elif action == 'KICK':
+            participant.status = ParticipantStatusChoices.REJECTED
+            participant.save(update_fields=['status', 'updated_at'])
+            event_type = 'host_forced_kick'
+        else:
+            return Response({"detail": "Acción inválida. Usa MUTE, DISABLE_VIDEO o KICK."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"session_{session.id}",
+                    {
+                        'type': 'session_event',
+                        'event_type': event_type,
+                        'target_user_id': str(user_id),
+                        'username': participant.user.username,
+                        'by_host': request.user.username,
+                    }
+                )
+            except Exception:
+                pass
+
+        return Response({
+            'status': 'success',
+            'action': action,
+            'target_user_id': str(user_id),
+            'participant': SessionParticipantSerializer(participant).data
+        })
+
+

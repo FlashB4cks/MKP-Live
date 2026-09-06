@@ -10,7 +10,36 @@ export const useSessionStore = create((set, get) => ({
   loading: false,
 
   setIsMinimized: (isMinimized) => set({ isMinimized }),
-  setActiveSession: (session) => set({ activeSession: session, sessionDetails: session }),
+  setActiveSession: (session) => {
+    if (session?.id) {
+      localStorage.setItem('active_session_id', String(session.id));
+    }
+    set({ activeSession: session, sessionDetails: session });
+  },
+
+  restoreActiveSession: async () => {
+    const savedId = localStorage.getItem('active_session_id');
+    if (!savedId) return null;
+    try {
+      const res = await api.get(`/sessions/${savedId}/`);
+      const session = res.data;
+      if (session && session.status !== 'ENDED') {
+        set({
+          activeSession: session,
+          sessionDetails: session,
+          isMinimized: false,
+        });
+        return session;
+      } else {
+        localStorage.removeItem('active_session_id');
+        return null;
+      }
+    } catch (err) {
+      console.warn('Could not restore active session', err);
+      localStorage.removeItem('active_session_id');
+      return null;
+    }
+  },
 
   checkVPNStatus: async () => {
     try {
@@ -63,6 +92,9 @@ export const useSessionStore = create((set, get) => ({
         title,
       });
       const newSession = res.data;
+      if (newSession?.id) {
+        localStorage.setItem('active_session_id', String(newSession.id));
+      }
       set((state) => ({
         activeSession: newSession,
         sessionDetails: newSession,
@@ -92,6 +124,9 @@ export const useSessionStore = create((set, get) => ({
     try {
       const res = await api.post(`/sessions/${sessionId}/start/`);
       const updated = res.data;
+      if (updated?.id) {
+        localStorage.setItem('active_session_id', String(updated.id));
+      }
       set((state) => ({
         activeSession: updated,
         sessionDetails: updated,
@@ -108,6 +143,7 @@ export const useSessionStore = create((set, get) => ({
   endSession: async (sessionId) => {
     try {
       await api.post(`/sessions/${sessionId}/end/`);
+      localStorage.removeItem('active_session_id');
       set((state) => ({
         activeSession: null,
         sessionDetails: null,
@@ -125,6 +161,9 @@ export const useSessionStore = create((set, get) => ({
       const res = await api.post(`/sessions/${sessionId}/join/`);
       const { participant_status, session } = res.data;
       if (participant_status === 'ACCEPTED') {
+        if (session?.id) {
+          localStorage.setItem('active_session_id', String(session.id));
+        }
         set({
           activeSession: session,
           sessionDetails: session,
@@ -159,7 +198,19 @@ export const useSessionStore = create((set, get) => ({
     }
   },
 
+  moderateParticipant: async (sessionId, userId, action) => {
+    try {
+      const res = await api.post(`/sessions/${sessionId}/participants/${userId}/moderate/`, {
+        action,
+      });
+      return { success: true, data: res.data };
+    } catch (err) {
+      return { success: false, error: err.response?.data?.detail || 'Error al moderar participante' };
+    }
+  },
+
   leaveActiveSession: () => {
+    localStorage.removeItem('active_session_id');
     set({ activeSession: null, sessionDetails: null, isMinimized: false });
   },
 }));

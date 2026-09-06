@@ -133,6 +133,54 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                     }
                 )
 
+            elif action == 'host_mute_participant':
+                target_user_id = data.get('target_user_id')
+                is_host = await self.verify_is_host(self.session_id, self.user)
+                if is_host and target_user_id:
+                    target_username = await self.moderate_participant_db(self.session_id, target_user_id, 'MUTE')
+                    await self.channel_layer.group_send(
+                        self.session_group_name,
+                        {
+                            'type': 'session_event',
+                            'event_type': 'host_forced_mute',
+                            'target_user_id': str(target_user_id),
+                            'username': target_username or 'Participante',
+                            'by_host': self.user.username,
+                        }
+                    )
+
+            elif action == 'host_disable_video_participant':
+                target_user_id = data.get('target_user_id')
+                is_host = await self.verify_is_host(self.session_id, self.user)
+                if is_host and target_user_id:
+                    target_username = await self.moderate_participant_db(self.session_id, target_user_id, 'DISABLE_VIDEO')
+                    await self.channel_layer.group_send(
+                        self.session_group_name,
+                        {
+                            'type': 'session_event',
+                            'event_type': 'host_forced_video_off',
+                            'target_user_id': str(target_user_id),
+                            'username': target_username or 'Participante',
+                            'by_host': self.user.username,
+                        }
+                    )
+
+            elif action == 'host_kick_participant':
+                target_user_id = data.get('target_user_id')
+                is_host = await self.verify_is_host(self.session_id, self.user)
+                if is_host and target_user_id:
+                    target_username = await self.moderate_participant_db(self.session_id, target_user_id, 'KICK')
+                    await self.channel_layer.group_send(
+                        self.session_group_name,
+                        {
+                            'type': 'session_event',
+                            'event_type': 'host_forced_kick',
+                            'target_user_id': str(target_user_id),
+                            'username': target_username or 'Participante',
+                            'by_host': self.user.username,
+                        }
+                    )
+
             elif action == 'chat_message':
                 content = data.get('content', '').strip()
                 if content:
@@ -170,6 +218,29 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                 'from_username': event.get('from_username', ''),
                 'signal_data': event.get('signal_data'),
             }))
+
+    @database_sync_to_async
+    def verify_is_host(self, session_id, user):
+        return VirtualSession.objects.filter(id=session_id, host=user).exists()
+
+    @database_sync_to_async
+    def moderate_participant_db(self, session_id, target_user_id, action):
+        p = SessionParticipant.objects.filter(
+            session_id=session_id,
+            user_id=target_user_id
+        ).select_related('user').first()
+        if not p:
+            return None
+        if action == 'MUTE':
+            p.is_audio_muted = True
+            p.save(update_fields=['is_audio_muted', 'updated_at'])
+        elif action == 'DISABLE_VIDEO':
+            p.is_video_off = True
+            p.save(update_fields=['is_video_off', 'updated_at'])
+        elif action == 'KICK':
+            p.status = ParticipantStatusChoices.REJECTED
+            p.save(update_fields=['status', 'updated_at'])
+        return p.user.username
 
     @database_sync_to_async
     def update_media_state(self, session_id, user_id, is_audio_muted, is_video_off):

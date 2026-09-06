@@ -20,6 +20,7 @@ import {
   MessageSquare,
   Send,
   X,
+  RotateCcw,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useSessionStore } from '../../store/sessionStore';
@@ -36,7 +37,14 @@ const ICE_SERVERS = {
   ],
 };
 
-function RemoteParticipantCard({ participant, stream }) {
+function RemoteParticipantCard({
+  participant,
+  stream,
+  isHost,
+  onHostMute,
+  onHostDisableVideo,
+  onHostKick,
+}) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -96,7 +104,7 @@ function RemoteParticipantCard({ participant, stream }) {
   const showVideo = !participant.is_video_off && stream && hasVideoTrack;
 
   return (
-    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-44 sm:h-64 lg:h-80">
+    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-44 sm:h-64 lg:h-80 group">
       {/* Dedicated Remote Audio Playback Element: never interrupted by video toggles */}
       <audio ref={audioRef} autoPlay playsInline />
 
@@ -108,6 +116,50 @@ function RemoteParticipantCard({ participant, stream }) {
         muted
         className={`w-full h-full object-cover ${showVideo ? 'block' : 'hidden'}`}
       />
+
+      {/* Host Quick Moderation Floating Controls */}
+      {isHost && (
+        <div className="absolute top-2.5 right-2.5 z-20 flex items-center space-x-1.5 bg-black/70 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition shadow-lg">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onHostMute?.(participant.user_id);
+            }}
+            className={`p-1 rounded transition ${
+              participant.is_audio_muted
+                ? 'text-discord-red bg-discord-red/20'
+                : 'text-discord-text-muted hover:text-white hover:bg-white/10'
+            }`}
+            title={participant.is_audio_muted ? 'Participante ya silenciado' : 'Silenciar micrófono'}
+          >
+            <MicOff className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onHostDisableVideo?.(participant.user_id);
+            }}
+            className={`p-1 rounded transition ${
+              participant.is_video_off
+                ? 'text-discord-yellow bg-discord-yellow/20'
+                : 'text-discord-text-muted hover:text-white hover:bg-white/10'
+            }`}
+            title={participant.is_video_off ? 'Cámara ya apagada' : 'Apagar cámara'}
+          >
+            <VideoOff className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onHostKick?.(participant.user_id);
+            }}
+            className="p-1 rounded text-discord-red hover:text-white hover:bg-discord-red transition"
+            title="Expulsar de la reunión"
+          >
+            <UserX className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {!showVideo && (
         <div className="flex flex-col items-center justify-center space-y-2">
@@ -141,13 +193,16 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const token = useAuthStore((state) => state.token);
   const endSession = useSessionStore((state) => state.endSession);
   const approveParticipant = useSessionStore((state) => state.approveParticipant);
+  const moderateParticipant = useSessionStore((state) => state.moderateParticipant);
   const isMinimized = useSessionStore((state) => state.isMinimized);
   const setIsMinimized = useSessionStore((state) => state.setIsMinimized);
 
   // Media States
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
+  const [facingMode, setFacingMode] = useState('user'); // 'user' | 'environment'
   const [mediaError, setMediaError] = useState(null);
+  const [moderationNotice, setModerationNotice] = useState(null);
   const [stream, setStream] = useState(null);
 
   // Remote participants and waiting room
@@ -185,6 +240,125 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const shouldInitiateWith = (otherUserId) => {
     if (!user?.id || !otherUserId) return false;
     return String(user.id) > String(otherUserId);
+  };
+
+  const optimizeVideoSender = (pc) => {
+    try {
+      const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+      if (sender && sender.getParameters) {
+        const params = sender.getParameters();
+        if (!params.encodings || params.encodings.length === 0) {
+          params.encodings = [{}];
+        }
+        params.encodings[0].maxBitrate = 1500000; // 1.5 Mbps for crisp HD
+        sender.setParameters(params).catch(() => {});
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const toggleCameraFacing = async () => {
+    const nextMode = facingMode === 'user' ? 'environment' : 'user';
+    try {
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((track) => track.stop());
+      }
+
+      let newStream = null;
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: nextMode },
+            width: { ideal: 1280, min: 640, max: 1920 },
+            height: { ideal: 720, min: 480, max: 1080 },
+            frameRate: { ideal: 30, min: 15, max: 60 },
+          },
+          audio: false,
+        });
+      } catch (hdErr) {
+        console.warn('[WebRTC] HD camera flip fallback:', hdErr);
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: nextMode },
+          audio: false,
+        });
+      }
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      if (!newVideoTrack) return;
+
+      if (localStreamRef.current) {
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) {
+          localStreamRef.current.removeTrack(oldTrack);
+        }
+        localStreamRef.current.addTrack(newVideoTrack);
+      }
+
+      Object.values(peerConnectionsRef.current).forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(newVideoTrack).catch((e) => console.warn('replaceTrack error:', e));
+        } else if (localStreamRef.current) {
+          pc.addTrack(newVideoTrack, localStreamRef.current);
+        }
+        optimizeVideoSender(pc);
+      });
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+      }
+      if (minimizedVideoRef.current) {
+        minimizedVideoRef.current.srcObject = localStreamRef.current;
+      }
+
+      setStream(new MediaStream(localStreamRef.current.getTracks()));
+      setFacingMode(nextMode);
+      setIsVideoOff(false);
+    } catch (err) {
+      console.error('[WebRTC] Error flipping camera:', err);
+    }
+  };
+
+  // Host Moderation Actions
+  const handleHostMute = async (targetUserId) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'host_mute_participant',
+          target_user_id: String(targetUserId),
+        })
+      );
+    }
+    moderateParticipant(session.id, targetUserId, 'MUTE');
+  };
+
+  const handleHostDisableVideo = async (targetUserId) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'host_disable_video_participant',
+          target_user_id: String(targetUserId),
+        })
+      );
+    }
+    moderateParticipant(session.id, targetUserId, 'DISABLE_VIDEO');
+  };
+
+  const handleHostKick = async (targetUserId) => {
+    if (window.confirm('¿Estás seguro de que deseas expulsar a este participante de la reunión?')) {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'host_kick_participant',
+            target_user_id: String(targetUserId),
+          })
+        );
+      }
+      moderateParticipant(session.id, targetUserId, 'KICK');
+      closePeerConnection(targetUserId);
+      setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(targetUserId)));
+    }
   };
 
   const sendSignal = (targetUserId, signalData) => {
@@ -504,16 +678,33 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       try {
         try {
           localStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true,
+            video: {
+              facingMode: { ideal: facingMode },
+              width: { ideal: 1280, min: 640, max: 1920 },
+              height: { ideal: 720, min: 480, max: 1080 },
+              frameRate: { ideal: 30, min: 15, max: 60 },
+            },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
           });
         } catch (camErr) {
-          console.warn('[WebRTC] Camera unavailable, trying audio only:', camErr);
-          localStream = await navigator.mediaDevices.getUserMedia({
-            video: false,
-            audio: true,
-          });
-          setIsVideoOff(true);
+          console.warn('[WebRTC] HD camera unavailable, trying standard video/audio:', camErr);
+          try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: true,
+            });
+          } catch (camErr2) {
+            console.warn('[WebRTC] Camera completely unavailable, trying audio only:', camErr2);
+            localStream = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: true,
+            });
+            setIsVideoOff(true);
+          }
         }
 
         setStream(localStream);
@@ -535,6 +726,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
               added = true;
             }
           });
+          optimizeVideoSender(pc);
           if (added || shouldInitiateWith(peerId)) {
             initiatePeerConnection(peerId);
           }
@@ -654,6 +846,52 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             setPendingRequests((prev) => prev.filter((p) => String(p.user_id) !== String(data.user_id)));
           } else if (data.event_type === 'session_ended') {
             handleEndOrLeave();
+          } else if (data.event_type === 'host_forced_mute') {
+            if (String(data.target_user_id) === String(user?.id)) {
+              if (localStreamRef.current) {
+                localStreamRef.current.getAudioTracks().forEach((t) => {
+                  t.enabled = false;
+                });
+              }
+              setIsAudioMuted(true);
+              setModerationNotice('El anfitrión ha silenciado tu micrófono.');
+              setTimeout(() => setModerationNotice(null), 6000);
+            } else {
+              setParticipants((prev) =>
+                prev.map((p) =>
+                  String(p.user_id) === String(data.target_user_id)
+                    ? { ...p, is_audio_muted: true }
+                    : p
+                )
+              );
+            }
+          } else if (data.event_type === 'host_forced_video_off') {
+            if (String(data.target_user_id) === String(user?.id)) {
+              if (localStreamRef.current) {
+                localStreamRef.current.getVideoTracks().forEach((t) => {
+                  t.enabled = false;
+                });
+              }
+              setIsVideoOff(true);
+              setModerationNotice('El anfitrión ha apagado tu cámara.');
+              setTimeout(() => setModerationNotice(null), 6000);
+            } else {
+              setParticipants((prev) =>
+                prev.map((p) =>
+                  String(p.user_id) === String(data.target_user_id)
+                    ? { ...p, is_video_off: true }
+                    : p
+                )
+              );
+            }
+          } else if (data.event_type === 'host_forced_kick') {
+            if (String(data.target_user_id) === String(user?.id)) {
+              alert('Has sido expulsado de la reunión por el anfitrión.');
+              handleEndOrLeave();
+            } else {
+              closePeerConnection(data.target_user_id);
+              setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(data.target_user_id)));
+            }
           }
         }
       } catch (err) {
@@ -1142,6 +1380,19 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Center: Video Grid */}
         <main className="flex-1 p-4 overflow-y-auto flex flex-col justify-center items-center relative transition-all duration-300">
+          {moderationNotice && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 bg-discord-red/90 text-white text-xs px-4 py-2.5 rounded-xl shadow-2xl flex items-center space-x-2 border border-white/20 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="w-4 h-4 text-white flex-shrink-0" />
+              <span className="font-bold">{moderationNotice}</span>
+              <button
+                onClick={() => setModerationNotice(null)}
+                className="ml-2 text-white/80 hover:text-white p-0.5 rounded"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {mediaError && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-discord-yellow/20 border border-discord-yellow/40 text-discord-yellow text-xs px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
@@ -1185,6 +1436,10 @@ export default function VirtualSessionRoom({ session, onLeave }) {
                 key={participant.user_id}
                 participant={participant}
                 stream={remoteStreams[String(participant.user_id)] || remoteStreams[participant.user_id]}
+                isHost={isHost}
+                onHostMute={handleHostMute}
+                onHostDisableVideo={handleHostDisableVideo}
+                onHostKick={handleHostKick}
               />
             ))}
           </div>
@@ -1439,7 +1694,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
                     {participants.map((p) => (
                       <div
                         key={p.user_id}
-                        className="flex items-center justify-between p-2 rounded-lg bg-discord-chat/40 text-xs"
+                        className="flex items-center justify-between p-2 rounded-lg bg-discord-chat/40 text-xs hover:bg-discord-chat/60 transition"
                       >
                         <div className="flex items-center space-x-2 min-w-0">
                           <div className="w-6 h-6 rounded-full bg-discord-channels text-[10px] font-bold flex items-center justify-center text-white flex-shrink-0">
@@ -1449,17 +1704,56 @@ export default function VirtualSessionRoom({ session, onLeave }) {
                             @{p.username} {!isHost && p.user_id === user?.id && '(Tú)'}
                           </span>
                         </div>
-                        <div className="flex items-center space-x-1 text-discord-text-muted">
-                          {p.is_audio_muted ? (
-                            <MicOff className="w-3 h-3 text-discord-red" />
-                          ) : (
-                            <Mic className="w-3 h-3 text-discord-green" />
+
+                        <div className="flex items-center space-x-1">
+                          {/* Host Moderation Controls */}
+                          {isHost && String(p.user_id) !== String(user?.id) && (
+                            <div className="flex items-center space-x-0.5 bg-black/40 rounded p-0.5 mr-1 border border-white/5">
+                              <button
+                                onClick={() => handleHostMute(p.user_id)}
+                                className={`p-1 rounded transition ${
+                                  p.is_audio_muted
+                                    ? 'text-discord-red bg-discord-red/20'
+                                    : 'text-discord-text-muted hover:text-white hover:bg-white/10'
+                                }`}
+                                title={p.is_audio_muted ? 'Micrófono ya silenciado' : 'Silenciar micrófono'}
+                              >
+                                <MicOff className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleHostDisableVideo(p.user_id)}
+                                className={`p-1 rounded transition ${
+                                  p.is_video_off
+                                    ? 'text-discord-yellow bg-discord-yellow/20'
+                                    : 'text-discord-text-muted hover:text-white hover:bg-white/10'
+                                }`}
+                                title={p.is_video_off ? 'Cámara ya apagada' : 'Apagar cámara'}
+                              >
+                                <VideoOff className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleHostKick(p.user_id)}
+                                className="p-1 rounded text-discord-red hover:text-white hover:bg-discord-red transition"
+                                title="Expulsar de la reunión"
+                              >
+                                <UserX className="w-3 h-3" />
+                              </button>
+                            </div>
                           )}
-                          {p.is_video_off ? (
-                            <VideoOff className="w-3 h-3 text-discord-red" />
-                          ) : (
-                            <Video className="w-3 h-3 text-discord-green" />
-                          )}
+
+                          {/* Media status indicators */}
+                          <div className="flex items-center space-x-1 text-discord-text-muted">
+                            {p.is_audio_muted ? (
+                              <MicOff className="w-3 h-3 text-discord-red" />
+                            ) : (
+                              <Mic className="w-3 h-3 text-discord-green" />
+                            )}
+                            {p.is_video_off ? (
+                              <VideoOff className="w-3 h-3 text-discord-red" />
+                            ) : (
+                              <Video className="w-3 h-3 text-discord-green" />
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1499,6 +1793,16 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         >
           {isVideoOff ? <VideoOff className="w-4 h-4 sm:w-6 sm:h-6" /> : <Video className="w-4 h-4 sm:w-6 sm:h-6" />}
           <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">{isVideoOff ? 'Cámara off' : 'Cámara'}</span>
+        </button>
+
+        {/* Flip Camera (Front/Rear for Mobile & Web) */}
+        <button
+          onClick={toggleCameraFacing}
+          className="flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition shadow-lg bg-discord-channels text-white hover:bg-discord-hover"
+          title={`Cambiar cámara (${facingMode === 'user' ? 'Frontal' : 'Trasera'})`}
+        >
+          <RotateCcw className={`w-4 h-4 sm:w-6 sm:h-6 ${facingMode === 'environment' ? 'text-discord-blurple rotate-180 transition-transform' : ''}`} />
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">Voltear</span>
         </button>
 
         {/* Toggle In-Meeting Chat Sidebar (Available to Host & All Members) */}

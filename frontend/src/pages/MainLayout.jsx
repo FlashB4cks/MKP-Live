@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { MessageSquare, Compass, Users, Video, Hash } from 'lucide-react';
 import ServerSidebar from '../components/servers/ServerSidebar';
 import ChannelSidebar from '../components/channels/ChannelSidebar';
 import ChatArea from '../components/chat/ChatArea';
@@ -12,8 +13,11 @@ export default function MainLayout() {
   const fetchServers = useServerStore((state) => state.fetchServers);
   const activeServer = useServerStore((state) => state.activeServer);
   const isDMView = useServerStore((state) => state.isDMView);
+  const setDMView = useServerStore((state) => state.setDMView);
   const activeSession = useSessionStore((state) => state.activeSession);
   const leaveActiveSession = useSessionStore((state) => state.leaveActiveSession);
+  const restoreActiveSession = useSessionStore((state) => state.restoreActiveSession);
+  const setIsMinimized = useSessionStore((state) => state.setIsMinimized);
 
   const [showMembers, setShowMembers] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -21,7 +25,8 @@ export default function MainLayout() {
 
   useEffect(() => {
     fetchServers();
-  }, [fetchServers]);
+    restoreActiveSession();
+  }, [fetchServers, restoreActiveSession]);
 
   const showDMs = isDMView || !activeServer;
 
@@ -51,7 +56,7 @@ export default function MainLayout() {
         }`}
       >
         {/* 1. Server Navigation Bar */}
-        <ServerSidebar />
+        <ServerSidebar onSelectDM={() => setMobileNavOpen(false)} />
 
         {/* 2. Channel Navigation & User Profile */}
         <ChannelSidebar
@@ -80,7 +85,75 @@ export default function MainLayout() {
         />
       )}
 
-      {/* 5. Virtual Session Call Room (Fullscreen or Minimized Floating PiP) */}
+      {/* 5. Mobile Bottom Navigation Bar (Fixed for Mobile Portrait mode) */}
+      <nav className="fixed bottom-0 left-0 right-0 z-30 h-14 bg-discord-sidebar border-t border-black/40 flex items-center justify-around px-2 md:hidden select-none">
+        {/* Direct Messages Shortcut */}
+        <button
+          onClick={() => {
+            setDMView();
+            setMobileNavOpen(false);
+          }}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
+            showDMs ? 'text-discord-blurple font-bold' : 'text-discord-text-muted hover:text-white'
+          }`}
+          title="Mensajes Directos"
+        >
+          <MessageSquare className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5 font-medium">Mensajes</span>
+        </button>
+
+        {/* Servers & Channels Drawer Toggle */}
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
+            !showDMs ? 'text-discord-blurple font-bold' : 'text-discord-text-muted hover:text-white'
+          }`}
+          title="Servidores y Canales"
+        >
+          <Compass className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5 font-medium">Servidores</span>
+        </button>
+
+        {/* Server Members Drawer Toggle (when in server) */}
+        {!showDMs && activeServer ? (
+          <button
+            onClick={() => setMobileMembersOpen(!mobileMembersOpen)}
+            className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
+              mobileMembersOpen ? 'text-discord-blurple font-bold' : 'text-discord-text-muted hover:text-white'
+            }`}
+            title="Integrantes del Servidor"
+          >
+            <Users className="w-5 h-5" />
+            <span className="text-[10px] mt-0.5 font-medium">Integrantes</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="flex flex-col items-center justify-center flex-1 py-1 text-discord-text-muted hover:text-white transition"
+            title="Explorar Canales"
+          >
+            <Hash className="w-5 h-5" />
+            <span className="text-[10px] mt-0.5 font-medium">Explorar</span>
+          </button>
+        )}
+
+        {/* Active Virtual Session Floating Shortcut */}
+        {activeSession && (
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="flex flex-col items-center justify-center flex-1 py-1 text-discord-green font-bold transition"
+            title="Reunión activa - Toca para volver"
+          >
+            <div className="relative">
+              <Video className="w-5 h-5" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-discord-green animate-ping" />
+            </div>
+            <span className="text-[10px] mt-0.5">En Reunión</span>
+          </button>
+        )}
+      </nav>
+
+      {/* 6. Virtual Session Call Room (Fullscreen or Minimized Floating PiP) */}
       {activeSession && (
         <VirtualSessionRoom
           session={activeSession}

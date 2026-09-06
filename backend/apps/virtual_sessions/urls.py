@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     VPNStatusView, SessionListCreateView, SessionDetailView,
     StartSessionView, EndSessionView, RequestJoinSessionView,
-    ApproveParticipantView, InstantSessionView, SessionMessagesView
+    ApproveParticipantView, InstantSessionView, SessionMessagesView,
+    ModerateParticipantView
 )
 
 urlpatterns = [
@@ -15,4 +16,5 @@ urlpatterns = [
     path('<uuid:pk>/join/', RequestJoinSessionView.as_view(), name='session_join'),
     path('<uuid:pk>/messages/', SessionMessagesView.as_view(), name='session_messages'),
     path('<uuid:pk>/participants/<uuid:user_id>/approve/', ApproveParticipantView.as_view(), name='session_approve_participant'),
+    path('<uuid:pk>/participants/<uuid:user_id>/moderate/', ModerateParticipantView.as_view(), name='session_moderate_participant'),
 ]

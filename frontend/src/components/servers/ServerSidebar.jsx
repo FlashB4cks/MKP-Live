@@ -4,7 +4,7 @@ import { useServerStore } from '../../store/serverStore';
 import CreateServerModal from '../modals/CreateServerModal';
 import JoinServerModal from '../modals/JoinServerModal';
 
-export default function ServerSidebar() {
+export default function ServerSidebar({ onSelectDM }) {
   const servers = useServerStore((state) => state.servers);
   const activeServer = useServerStore((state) => state.activeServer);
   const selectServer = useServerStore((state) => state.selectServer);
@@ -27,7 +27,10 @@ export default function ServerSidebar() {
           }`}
         />
         <button
-          onClick={() => setDMView()}
+          onClick={() => {
+            setDMView();
+            onSelectDM?.();
+          }}
           className={`w-12 h-12 rounded-[24px] group-hover:rounded-[16px] flex items-center justify-center transition-all duration-200 ${
             isDMsActive
               ? 'bg-discord-blurple rounded-[16px] text-white'
