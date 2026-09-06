@@ -5,6 +5,8 @@ from core.vpn_security import verify_ws_vpn_access
 from .models import VirtualSession, SessionParticipant, ParticipantStatusChoices
 
 class SessionSignalingConsumer(AsyncWebsocketConsumer):
+    active_screen_shares = {}  # session_id -> { user_id, username, has_audio, stream_id }
+
     async def connect(self):
         self.user = self.scope.get('user')
         if not self.user or not self.user.is_authenticated:
@@ -32,6 +34,20 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
+        # If a screen share is already active in this session, inform the connecting user
+        session_key = str(self.session_id)
+        if session_key in self.active_screen_shares and not self.is_waiting:
+            share_info = self.active_screen_shares[session_key]
+            await self.send(text_data=json.dumps({
+                'type': 'session_event',
+                'event_type': 'screen_share_status',
+                'user_id': share_info['user_id'],
+                'username': share_info['username'],
+                'is_sharing': True,
+                'has_audio': share_info['has_audio'],
+                'stream_id': share_info['stream_id'],
+            }))
+
         # Only notify user_joined if entering active room (not waiting room)
         if not self.is_waiting:
             await self.channel_layer.group_send(
@@ -53,6 +69,23 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
 
             # Only notify user_left if participant was in active room
             if not getattr(self, 'is_waiting', False):
+                session_key = str(getattr(self, 'session_id', ''))
+                current_share = self.active_screen_shares.get(session_key)
+                if current_share and current_share.get('user_id') == str(self.user.id):
+                    self.active_screen_shares.pop(session_key, None)
+                    await self.channel_layer.group_send(
+                        self.session_group_name,
+                        {
+                            'type': 'session_event',
+                            'event_type': 'screen_share_status',
+                            'user_id': str(self.user.id),
+                            'username': self.user.username,
+                            'is_sharing': False,
+                            'has_audio': False,
+                            'stream_id': '',
+                        }
+                    )
+
                 await self.channel_layer.group_send(
                     self.session_group_name,
                     {
@@ -193,6 +226,37 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                             'message': msg_data,
                         }
                     )
+
+            elif action == 'screen_share_status':
+                is_sharing = bool(data.get('is_sharing', False))
+                has_audio = bool(data.get('has_audio', False))
+                stream_id = str(data.get('stream_id', ''))
+
+                session_key = str(self.session_id)
+                if is_sharing:
+                    self.active_screen_shares[session_key] = {
+                        'user_id': str(self.user.id),
+                        'username': self.user.username,
+                        'has_audio': has_audio,
+                        'stream_id': stream_id,
+                    }
+                else:
+                    current_share = self.active_screen_shares.get(session_key)
+                    if current_share and current_share.get('user_id') == str(self.user.id):
+                        self.active_screen_shares.pop(session_key, None)
+
+                await self.channel_layer.group_send(
+                    self.session_group_name,
+                    {
+                        'type': 'session_event',
+                        'event_type': 'screen_share_status',
+                        'user_id': str(self.user.id),
+                        'username': self.user.username,
+                        'is_sharing': is_sharing,
+                        'has_audio': has_audio,
+                        'stream_id': stream_id,
+                    }
+                )
 
         except json.JSONDecodeError:
             pass

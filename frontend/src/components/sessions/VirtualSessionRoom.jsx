@@ -21,9 +21,15 @@ import {
   Send,
   X,
   RotateCcw,
+  Monitor,
+  MonitorOff,
+  Volume2,
+  VolumeX,
+  Volume1,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useSessionStore } from '../../store/sessionStore';
+import ScreenShareModal from './ScreenShareModal';
 import api from '../../api/client';
 
 const ICE_SERVERS = {
@@ -104,7 +110,7 @@ function RemoteParticipantCard({
   const showVideo = !participant.is_video_off && stream && hasVideoTrack;
 
   return (
-    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-44 sm:h-64 lg:h-80 group">
+    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-full w-full min-h-[140px] group">
       {/* Dedicated Remote Audio Playback Element: never interrupted by video toggles */}
       <audio ref={audioRef} autoPlay playsInline />
 
@@ -188,6 +194,194 @@ function RemoteParticipantCard({
   );
 }
 
+function ScreenShareStage({
+  activeScreenShare,
+  isScreenSharing,
+  screenStream,
+  remoteScreenStream,
+  isScreenAudioMuted,
+  onToggleScreenAudioMute,
+  screenAudioVolume,
+  onScreenAudioVolumeChange,
+  isPresenterAudioMuted,
+  onTogglePresenterAudio,
+  onStopScreenShare,
+}) {
+  const videoRef = useRef(null);
+  const audioRef = useRef(null);
+  const stageContainerRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const currentStream = isScreenSharing ? screenStream : remoteScreenStream;
+
+  useEffect(() => {
+    if (videoRef.current && currentStream) {
+      if (videoRef.current.srcObject !== currentStream) {
+        videoRef.current.srcObject = currentStream;
+      }
+      videoRef.current.play().catch(() => {});
+    }
+  }, [currentStream]);
+
+  // Audio for remote viewers only (presenter does not play back their own screen audio to avoid echo/feedback)
+  useEffect(() => {
+    if (!isScreenSharing && audioRef.current && remoteScreenStream) {
+      if (audioRef.current.srcObject !== remoteScreenStream) {
+        audioRef.current.srcObject = remoteScreenStream;
+      }
+      audioRef.current.volume = screenAudioVolume;
+      audioRef.current.muted = isScreenAudioMuted;
+      audioRef.current.play().catch(() => {});
+    }
+  }, [isScreenSharing, remoteScreenStream, screenAudioVolume, isScreenAudioMuted]);
+
+  const toggleFullscreen = () => {
+    if (!stageContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      stageContainerRef.current.requestFullscreen?.().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  return (
+    <div
+      ref={stageContainerRef}
+      className="relative w-full max-w-6xl h-[48vh] sm:h-[55vh] lg:h-[62vh] bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl flex flex-col mb-3 group flex-shrink-0"
+    >
+      {/* Remote Screen Audio Element */}
+      {!isScreenSharing && <audio ref={audioRef} autoPlay playsInline />}
+
+      {/* Screen Video Display */}
+      <div className="flex-1 w-full h-full relative flex items-center justify-center overflow-hidden bg-black">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-contain"
+        />
+
+        {!currentStream && (
+          <div className="flex flex-col items-center justify-center space-y-2 text-discord-text-muted">
+            <Monitor className="w-12 h-12 animate-pulse text-discord-blurple" />
+            <p className="text-sm font-semibold text-white">Conectando transmisión de pantalla...</p>
+          </div>
+        )}
+      </div>
+
+      {/* Top Floating Control & Info Bar */}
+      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
+        {/* Presenter Name & Transmission Tag */}
+        <div className="pointer-events-auto flex items-center space-x-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-xs shadow-lg">
+          <div className="w-2 h-2 rounded-full bg-discord-green animate-ping" />
+          <Monitor className="w-4 h-4 text-discord-blurple" />
+          <span className="font-bold text-white">
+            {isScreenSharing ? 'Tu pantalla' : `Pantalla de @${activeScreenShare?.username || 'Participante'}`}
+          </span>
+          {activeScreenShare?.has_audio && (
+            <span className="text-[10px] bg-discord-green/20 text-discord-green px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+              <Volume2 className="w-3 h-3" /> Con sonido
+            </span>
+          )}
+        </div>
+
+        {/* Action Controls */}
+        <div className="pointer-events-auto flex items-center space-x-2">
+          {/* Controls for the Presenter */}
+          {isScreenSharing && (
+            <div className="flex items-center space-x-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 shadow-lg">
+              {activeScreenShare?.has_audio && (
+                <button
+                  onClick={onTogglePresenterAudio}
+                  className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    isPresenterAudioMuted
+                      ? 'bg-discord-red text-white'
+                      : 'bg-white/10 hover:bg-white/20 text-white'
+                  }`}
+                  title={isPresenterAudioMuted ? 'Reactivar audio de transmisión' : 'Silenciar audio de transmisión'}
+                >
+                  {isPresenterAudioMuted ? (
+                    <VolumeX className="w-3.5 h-3.5" />
+                  ) : (
+                    <Volume2 className="w-3.5 h-3.5 text-discord-green" />
+                  )}
+                  <span className="text-[11px]">
+                    {isPresenterAudioMuted ? 'Audio mutado' : 'Silenciar audio'}
+                  </span>
+                </button>
+              )}
+              <button
+                onClick={onStopScreenShare}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-discord-red hover:bg-discord-red/90 text-white transition shadow"
+              >
+                <MonitorOff className="w-3.5 h-3.5" />
+                <span className="text-[11px]">Dejar de transmitir</span>
+              </button>
+            </div>
+          )}
+
+          {/* Controls for Remote Viewers (Individual Audio Mute & Volume) */}
+          {!isScreenSharing && activeScreenShare?.has_audio && (
+            <div className="flex items-center space-x-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/15 shadow-xl text-xs">
+              <button
+                onClick={onToggleScreenAudioMute}
+                className={`p-1.5 rounded-lg transition ${
+                  isScreenAudioMuted
+                    ? 'bg-discord-red text-white'
+                    : 'text-white hover:bg-white/10'
+                }`}
+                title={isScreenAudioMuted ? 'Activar sonido de transmisión' : 'Silenciar sonido de transmisión'}
+              >
+                {isScreenAudioMuted ? (
+                  <VolumeX className="w-4 h-4 text-white" />
+                ) : screenAudioVolume === 0 ? (
+                  <VolumeX className="w-4 h-4 text-discord-text-muted" />
+                ) : (
+                  <Volume2 className="w-4 h-4 text-discord-green" />
+                )}
+              </button>
+
+              <div className="flex items-center space-x-1.5">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isScreenAudioMuted ? 0 : screenAudioVolume}
+                  onChange={(e) => onScreenAudioVolumeChange(parseFloat(e.target.value))}
+                  className="w-16 sm:w-24 h-1.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-discord-blurple"
+                  title="Ajustar volumen de la pantalla compartida (exclusivo para ti)"
+                />
+                <span className="text-[10px] text-discord-text-muted font-mono w-7 text-right">
+                  {isScreenAudioMuted ? '0%' : `${Math.round(screenAudioVolume * 100)}%`}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Fullscreen Button */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-xl bg-black/80 backdrop-blur-md border border-white/10 text-white hover:bg-white/20 transition shadow-lg"
+            title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function VirtualSessionRoom({ session, onLeave }) {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
@@ -209,6 +403,23 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const [participants, setParticipants] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [remoteStreams, setRemoteStreams] = useState({});
+
+  // Screen Sharing States & Refs
+  const [isScreenModalOpen, setIsScreenModalOpen] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState(null);
+  const [activeScreenShare, setActiveScreenShare] = useState(null); // { user_id, username, has_audio, stream_id }
+  const [remoteScreenStream, setRemoteScreenStream] = useState(null);
+  const [isScreenAudioMuted, setIsScreenAudioMuted] = useState(false);
+  const [screenAudioVolume, setScreenAudioVolume] = useState(1);
+  const [isPresenterAudioMuted, setIsPresenterAudioMuted] = useState(false);
+
+  const localScreenStreamRef = useRef(null);
+  const screenSendersRef = useRef({});
+  const activeScreenShareRef = useRef(activeScreenShare);
+  useEffect(() => {
+    activeScreenShareRef.current = activeScreenShare;
+  }, [activeScreenShare]);
 
   // WebRTC Mesh refs
   const peerConnectionsRef = useRef({});
@@ -361,6 +572,168 @@ export default function VirtualSessionRoom({ session, onLeave }) {
     }
   };
 
+  // Screen Share Actions
+  const startScreenShare = async (includeAudio = true) => {
+    try {
+      let captureStream = null;
+      try {
+        captureStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: 'always',
+            displaySurface: 'monitor',
+          },
+          audio: includeAudio
+            ? {
+                echoCancellation: true,
+                noiseSuppression: false,
+                autoGainControl: false,
+              }
+            : false,
+        });
+      } catch (err) {
+        if (err.name === 'NotAllowedError') {
+          console.log('[ScreenShare] User cancelled screen picker');
+          return;
+        }
+        throw err;
+      }
+
+      const videoTrack = captureStream.getVideoTracks()[0];
+      if (!videoTrack) return;
+
+      const audioTracks = captureStream.getAudioTracks();
+      const hasAudio = audioTracks.length > 0;
+      const audioTrack = hasAudio ? audioTracks[0] : null;
+
+      localScreenStreamRef.current = captureStream;
+      setScreenStream(captureStream);
+      setIsScreenSharing(true);
+      const shareData = {
+        user_id: String(user?.id),
+        username: user?.username,
+        has_audio: hasAudio,
+        stream_id: captureStream.id,
+      };
+      setActiveScreenShare(shareData);
+
+      // Listen for browser native stop share event (e.g. clicking "Stop sharing" bar)
+      videoTrack.onended = () => {
+        stopScreenShare();
+      };
+
+      // Broadcast screen share status via WebSocket
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'screen_share_status',
+            is_sharing: true,
+            has_audio: hasAudio,
+            stream_id: captureStream.id,
+          })
+        );
+      }
+
+      // Add screen tracks to all existing peer connections and renegotiate
+      Object.entries(peerConnectionsRef.current).forEach(([peerId, pc]) => {
+        try {
+          const vSender = pc.addTrack(videoTrack, captureStream);
+          const aSender = audioTrack ? pc.addTrack(audioTrack, captureStream) : null;
+          screenSendersRef.current[peerId] = { videoSender: vSender, audioSender: aSender };
+          optimizeVideoSender(pc);
+          initiatePeerConnection(peerId);
+        } catch (e) {
+          console.warn(`[ScreenShare] Error adding screen track to peer ${peerId}:`, e);
+        }
+      });
+    } catch (err) {
+      console.error('[ScreenShare] Error starting screen share:', err);
+    }
+  };
+
+  const stopScreenShare = () => {
+    if (localScreenStreamRef.current) {
+      localScreenStreamRef.current.getTracks().forEach((track) => track.stop());
+      localScreenStreamRef.current = null;
+    }
+
+    setScreenStream(null);
+    setIsScreenSharing(false);
+    setActiveScreenShare(null);
+    setIsPresenterAudioMuted(false);
+
+    // Remove screen senders from peer connections and renegotiate
+    Object.entries(peerConnectionsRef.current).forEach(([peerId, pc]) => {
+      const senders = screenSendersRef.current[peerId];
+      if (senders) {
+        try {
+          if (senders.videoSender) pc.removeTrack(senders.videoSender);
+          if (senders.audioSender) pc.removeTrack(senders.audioSender);
+        } catch (e) {
+          console.warn(`[ScreenShare] Error removing senders for peer ${peerId}:`, e);
+        }
+        delete screenSendersRef.current[peerId];
+        initiatePeerConnection(peerId);
+      }
+    });
+
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'screen_share_status',
+          is_sharing: false,
+          has_audio: false,
+          stream_id: '',
+        })
+      );
+    }
+  };
+
+  const togglePresenterScreenAudio = () => {
+    if (!localScreenStreamRef.current) return;
+    const aTrack = localScreenStreamRef.current.getAudioTracks()[0];
+    if (aTrack) {
+      const nextMuted = !isPresenterAudioMuted;
+      aTrack.enabled = !nextMuted;
+      setIsPresenterAudioMuted(nextMuted);
+    }
+  };
+
+  const handleToggleScreenAudioMute = () => {
+    setIsScreenAudioMuted((prev) => !prev);
+  };
+
+  const handleScreenAudioVolumeChange = (newVolume) => {
+    setScreenAudioVolume(newVolume);
+    if (newVolume > 0 && isScreenAudioMuted) {
+      setIsScreenAudioMuted(false);
+    }
+  };
+
+  // Synchronize remote screen stream when activeScreenShare is received
+  useEffect(() => {
+    if (activeScreenShare && !isScreenSharing) {
+      const peerKey = String(activeScreenShare.user_id);
+      const pc = peerConnectionsRef.current[peerKey];
+      if (pc) {
+        const receivers = pc.getReceivers();
+        const videoReceivers = receivers.filter((r) => r.track && r.track.kind === 'video');
+        const audioReceivers = receivers.filter((r) => r.track && r.track.kind === 'audio');
+        if (videoReceivers.length > 1) {
+          const screenVideoTrack = videoReceivers[videoReceivers.length - 1].track;
+          const screenAudioTrack =
+            activeScreenShare.has_audio && audioReceivers.length > 1
+              ? audioReceivers[audioReceivers.length - 1].track
+              : null;
+          const tracks = [screenVideoTrack];
+          if (screenAudioTrack) tracks.push(screenAudioTrack);
+          setRemoteScreenStream(new MediaStream(tracks));
+        }
+      }
+    } else if (!activeScreenShare && !isScreenSharing) {
+      setRemoteScreenStream(null);
+    }
+  }, [activeScreenShare, isScreenSharing]);
+
   const sendSignal = (targetUserId, signalData) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
@@ -414,6 +787,31 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
       pc.ontrack = (event) => {
         console.log(`[WebRTC] Remote track received from ${peerKey}:`, event.track.kind);
+        const incomingStream = event.streams && event.streams[0];
+        const screenShare = activeScreenShareRef.current;
+
+        // Check if track belongs to screen share
+        const isScreen =
+          (screenShare && incomingStream && incomingStream.id === screenShare.stream_id) ||
+          (screenShare && String(screenShare.user_id) === peerKey && (
+            (event.track.kind === 'video' && pc.getReceivers().filter((r) => r.track && r.track.kind === 'video').length > 1) ||
+            (event.track.kind === 'audio' && screenShare.has_audio && pc.getReceivers().filter((r) => r.track && r.track.kind === 'audio').length > 1)
+          ));
+
+        if (isScreen) {
+          console.log(`[WebRTC] Attached to remoteScreenStream from ${peerKey} (${event.track.kind})`);
+          setRemoteScreenStream((prev) => {
+            if (!prev) {
+              return incomingStream || new MediaStream([event.track]);
+            }
+            if (!prev.getTracks().some((t) => t.id === event.track.id)) {
+              prev.addTrack(event.track);
+            }
+            return new MediaStream(prev.getTracks());
+          });
+          return;
+        }
+
         setRemoteStreams((prev) => {
           let currentStream = prev[peerKey] || prev[targetUserId];
           if (!currentStream) {
@@ -465,6 +863,20 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         if (!senders.some((s) => s.track === track)) {
           console.log(`[WebRTC] Attaching local track ${track.kind} to peer ${peerKey}`);
           pc.addTrack(track, localStreamRef.current);
+        }
+      });
+    }
+
+    // Always attach any local screen tracks from localScreenStreamRef to pc if not already added
+    if (localScreenStreamRef.current) {
+      const senders = pc.getSenders();
+      localScreenStreamRef.current.getTracks().forEach((track) => {
+        if (!senders.some((s) => s.track === track)) {
+          console.log(`[WebRTC] Attaching local screen track ${track.kind} to peer ${peerKey}`);
+          const sender = pc.addTrack(track, localScreenStreamRef.current);
+          if (!screenSendersRef.current[peerKey]) screenSendersRef.current[peerKey] = {};
+          if (track.kind === 'video') screenSendersRef.current[peerKey].videoSender = sender;
+          if (track.kind === 'audio') screenSendersRef.current[peerKey].audioSender = sender;
         }
       });
     }
@@ -548,6 +960,18 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           localStreamRef.current.getTracks().forEach((track) => {
             if (!senders.some((s) => s.track === track)) {
               pc.addTrack(track, localStreamRef.current);
+            }
+          });
+        }
+
+        if (localScreenStreamRef.current) {
+          const senders = pc.getSenders();
+          localScreenStreamRef.current.getTracks().forEach((track) => {
+            if (!senders.some((s) => s.track === track)) {
+              const sender = pc.addTrack(track, localScreenStreamRef.current);
+              if (!screenSendersRef.current[peerKey]) screenSendersRef.current[peerKey] = {};
+              if (track.kind === 'video') screenSendersRef.current[peerKey].videoSender = sender;
+              if (track.kind === 'audio') screenSendersRef.current[peerKey].audioSender = sender;
             }
           });
         }
@@ -844,8 +1268,27 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             closePeerConnection(data.user_id);
             setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(data.user_id)));
             setPendingRequests((prev) => prev.filter((p) => String(p.user_id) !== String(data.user_id)));
+            if (activeScreenShareRef.current && String(activeScreenShareRef.current.user_id) === String(data.user_id)) {
+              setActiveScreenShare(null);
+              setRemoteScreenStream(null);
+            }
           } else if (data.event_type === 'session_ended') {
             handleEndOrLeave();
+          } else if (data.event_type === 'screen_share_status') {
+            if (data.is_sharing) {
+              setActiveScreenShare({
+                user_id: String(data.user_id),
+                username: data.username,
+                has_audio: Boolean(data.has_audio),
+                stream_id: data.stream_id,
+              });
+              if (String(data.user_id) !== String(user?.id)) {
+                setIsScreenAudioMuted(false);
+              }
+            } else {
+              setActiveScreenShare(null);
+              setRemoteScreenStream(null);
+            }
           } else if (data.event_type === 'host_forced_mute') {
             if (String(data.target_user_id) === String(user?.id)) {
               if (localStreamRef.current) {
@@ -1021,6 +1464,10 @@ export default function VirtualSessionRoom({ session, onLeave }) {
     });
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
+    }
+    if (localScreenStreamRef.current) {
+      localScreenStreamRef.current.getTracks().forEach((track) => track.stop());
+      localScreenStreamRef.current = null;
     }
     if (wsRef.current) {
       wsRef.current.close();
@@ -1400,9 +1847,38 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             </div>
           )}
 
-          <div className="w-full h-full max-h-[75vh] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 max-w-6xl mx-auto items-center">
+          {/* Active Screen Sharing Stage */}
+          {(activeScreenShare || isScreenSharing || remoteScreenStream) && (
+            <ScreenShareStage
+              activeScreenShare={activeScreenShare}
+              isScreenSharing={isScreenSharing}
+              screenStream={screenStream}
+              remoteScreenStream={remoteScreenStream}
+              isScreenAudioMuted={isScreenAudioMuted}
+              onToggleScreenAudioMute={handleToggleScreenAudioMute}
+              screenAudioVolume={screenAudioVolume}
+              onScreenAudioVolumeChange={handleScreenAudioVolumeChange}
+              isPresenterAudioMuted={isPresenterAudioMuted}
+              onTogglePresenterAudio={togglePresenterScreenAudio}
+              onStopScreenShare={stopScreenShare}
+            />
+          )}
+
+          <div
+            className={`w-full max-w-6xl mx-auto items-center ${
+              activeScreenShare || isScreenSharing || remoteScreenStream
+                ? 'flex gap-2.5 overflow-x-auto pb-2 flex-shrink-0'
+                : 'h-full max-h-[75vh] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4'
+            }`}
+          >
             {/* Local User Video Card */}
-            <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-44 sm:h-64 lg:h-80">
+            <div
+              className={`relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 ${
+                activeScreenShare || isScreenSharing || remoteScreenStream
+                  ? 'w-44 sm:w-56 h-32 sm:h-36 flex-shrink-0'
+                  : 'h-44 sm:h-64 lg:h-80 w-full'
+              }`}
+            >
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -1432,15 +1908,23 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
             {/* Remote Participants Video Cards */}
             {participants.map((participant) => (
-              <RemoteParticipantCard
+              <div
                 key={participant.user_id}
-                participant={participant}
-                stream={remoteStreams[String(participant.user_id)] || remoteStreams[participant.user_id]}
-                isHost={isHost}
-                onHostMute={handleHostMute}
-                onHostDisableVideo={handleHostDisableVideo}
-                onHostKick={handleHostKick}
-              />
+                className={
+                  activeScreenShare || isScreenSharing || remoteScreenStream
+                    ? 'w-44 sm:w-56 h-32 sm:h-36 flex-shrink-0'
+                    : 'w-full h-44 sm:h-64 lg:h-80'
+                }
+              >
+                <RemoteParticipantCard
+                  participant={participant}
+                  stream={remoteStreams[String(participant.user_id)] || remoteStreams[participant.user_id]}
+                  isHost={isHost}
+                  onHostMute={handleHostMute}
+                  onHostDisableVideo={handleHostDisableVideo}
+                  onHostKick={handleHostKick}
+                />
+              </div>
             ))}
           </div>
         </main>
@@ -1805,6 +2289,32 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">Voltear</span>
         </button>
 
+        {/* Toggle Screen Sharing */}
+        <button
+          onClick={() => {
+            if (isScreenSharing) {
+              stopScreenShare();
+            } else {
+              setIsScreenModalOpen(true);
+            }
+          }}
+          className={`flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition shadow-lg ${
+            isScreenSharing
+              ? 'bg-discord-green text-white ring-2 ring-discord-green/50 animate-pulse'
+              : 'bg-discord-channels text-white hover:bg-discord-hover'
+          }`}
+          title={isScreenSharing ? 'Detener transmisión de pantalla' : 'Transmitir pantalla'}
+        >
+          {isScreenSharing ? (
+            <MonitorOff className="w-4 h-4 sm:w-6 sm:h-6" />
+          ) : (
+            <Monitor className="w-4 h-4 sm:w-6 sm:h-6" />
+          )}
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">
+            {isScreenSharing ? 'Detener' : 'Pantalla'}
+          </span>
+        </button>
+
         {/* Toggle In-Meeting Chat Sidebar (Available to Host & All Members) */}
         <button
           onClick={() => toggleSidebarTab('chat')}
@@ -1860,6 +2370,13 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           </span>
         </button>
       </footer>
+
+      {/* Screen Share Audio Options Modal */}
+      <ScreenShareModal
+        isOpen={isScreenModalOpen}
+        onClose={() => setIsScreenModalOpen(false)}
+        onStart={startScreenShare}
+      />
     </div>
   );
 }
