@@ -350,4 +350,35 @@ class ModerateParticipantView(APIView):
             'participant': SessionParticipantSerializer(participant).data
         })
 
+class LeaveSessionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        session = get_object_or_404(VirtualSession, pk=pk)
+        if session.host != request.user:
+            SessionParticipant.objects.filter(
+                session=session,
+                user=request.user
+            ).update(
+                status=ParticipantStatusChoices.LEFT,
+                updated_at=timezone.now()
+            )
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"session_{session.id}",
+                    {
+                        'type': 'session_event',
+                        'event_type': 'user_left',
+                        'user_id': str(request.user.id),
+                        'username': request.user.username,
+                    }
+                )
+            except Exception:
+                pass
+
+        return Response({"detail": "Has salido de la reunión exitosamente."})
+
 

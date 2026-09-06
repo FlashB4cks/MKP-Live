@@ -3,7 +3,7 @@ from .views import (
     VPNStatusView, SessionListCreateView, SessionDetailView,
     StartSessionView, EndSessionView, RequestJoinSessionView,
     ApproveParticipantView, InstantSessionView, SessionMessagesView,
-    ModerateParticipantView
+    ModerateParticipantView, LeaveSessionView
 )
 
 urlpatterns = [
@@ -14,6 +14,7 @@ urlpatterns = [
     path('<uuid:pk>/start/', StartSessionView.as_view(), name='session_start'),
     path('<uuid:pk>/end/', EndSessionView.as_view(), name='session_end'),
     path('<uuid:pk>/join/', RequestJoinSessionView.as_view(), name='session_join'),
+    path('<uuid:pk>/leave/', LeaveSessionView.as_view(), name='session_leave'),
     path('<uuid:pk>/messages/', SessionMessagesView.as_view(), name='session_messages'),
     path('<uuid:pk>/participants/<uuid:user_id>/approve/', ApproveParticipantView.as_view(), name='session_approve_participant'),
     path('<uuid:pk>/participants/<uuid:user_id>/moderate/', ModerateParticipantView.as_view(), name='session_moderate_participant'),

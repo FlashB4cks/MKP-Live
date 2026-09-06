@@ -37,11 +37,9 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 function RemoteParticipantCard({
@@ -54,33 +52,56 @@ function RemoteParticipantCard({
 }) {
   const videoRef = useRef(null);
   const audioRef = useRef(null);
+  const [hasVideo, setHasVideo] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    if (!stream) return;
+    if (!stream) {
+      setHasVideo(false);
+      setIsPlaying(false);
+      return;
+    }
 
-    const attachMedia = () => {
+    const checkTracksAndPlay = () => {
+      const vTracks = stream.getVideoTracks ? stream.getVideoTracks() : [];
+      const liveVideo = vTracks.length > 0 && vTracks.some((t) => t.enabled && t.readyState === 'live');
+      setHasVideo(liveVideo);
+
       if (videoRef.current && videoRef.current.srcObject !== stream) {
         videoRef.current.srcObject = stream;
       }
       if (videoRef.current) {
-        videoRef.current.play().catch((e) => console.warn('[WebRTC] Video autoplay caught:', e));
+        videoRef.current.play().catch(() => {});
       }
+
       if (audioRef.current && audioRef.current.srcObject !== stream) {
         audioRef.current.srcObject = stream;
       }
       if (audioRef.current) {
-        audioRef.current.play().catch((e) => console.warn('[WebRTC] Audio autoplay caught:', e));
+        audioRef.current.play().catch(() => {});
       }
     };
 
-    attachMedia();
+    checkTracksAndPlay();
 
-    stream.addEventListener('addtrack', attachMedia);
-    stream.addEventListener('removetrack', attachMedia);
+    stream.addEventListener('addtrack', checkTracksAndPlay);
+    stream.addEventListener('removetrack', checkTracksAndPlay);
+
+    const allTracks = stream.getTracks ? stream.getTracks() : [];
+    allTracks.forEach((track) => {
+      track.addEventListener('unmute', checkTracksAndPlay);
+      track.addEventListener('mute', checkTracksAndPlay);
+      track.addEventListener('ended', checkTracksAndPlay);
+    });
 
     return () => {
-      stream.removeEventListener('addtrack', attachMedia);
-      stream.removeEventListener('removetrack', attachMedia);
+      stream.removeEventListener('addtrack', checkTracksAndPlay);
+      stream.removeEventListener('removetrack', checkTracksAndPlay);
+      allTracks.forEach((track) => {
+        track.removeEventListener('unmute', checkTracksAndPlay);
+        track.removeEventListener('mute', checkTracksAndPlay);
+        track.removeEventListener('ended', checkTracksAndPlay);
+      });
     };
   }, [stream]);
 
@@ -101,28 +122,41 @@ function RemoteParticipantCard({
     };
   }, [stream]);
 
-  const hasVideoTrack = Boolean(
-    stream &&
-      stream.getVideoTracks &&
-      stream.getVideoTracks().length > 0 &&
-      stream.getVideoTracks().some((t) => t.enabled && t.readyState === 'live')
-  );
-
-  const showVideo = !participant.is_video_off && stream && hasVideoTrack;
+  const showVideo = !participant.is_video_off && (hasVideo || isPlaying);
 
   return (
     <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-full w-full min-h-[140px] group">
       {/* Dedicated Remote Audio Playback Element: never interrupted by video toggles */}
       <audio ref={audioRef} autoPlay playsInline />
 
-      {/* Remote Video Element: muted to prevent echo since audio is handled by dedicated audio tag */}
+      {/* Remote Video Element: kept alive in DOM to avoid decoder freezes on mobile browsers */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover ${showVideo ? 'block' : 'hidden'}`}
+        onPlaying={() => setIsPlaying(true)}
+        onWaiting={() => setIsPlaying(false)}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+          showVideo ? 'opacity-100 relative z-10' : 'opacity-0 absolute inset-0 pointer-events-none'
+        }`}
       />
+
+      {/* Placeholder Avatar when Video is connecting, awaiting keyframes or disabled */}
+      {!showVideo && (
+        <div className="flex flex-col items-center justify-center space-y-2 z-0">
+          <div className="w-20 h-20 rounded-full bg-discord-channels flex items-center justify-center text-3xl font-bold text-white shadow-xl">
+            {participant.username?.[0]?.toUpperCase() || 'P'}
+          </div>
+          <span className="text-xs text-discord-text-muted">
+            {participant.is_video_off
+              ? 'Cámara desactivada'
+              : !stream
+              ? 'Conectando...'
+              : 'Esperando video...'}
+          </span>
+        </div>
+      )}
 
       {/* Host Quick Moderation Floating Controls */}
       {isHost && (
@@ -168,22 +202,7 @@ function RemoteParticipantCard({
         </div>
       )}
 
-      {!showVideo && (
-        <div className="flex flex-col items-center justify-center space-y-2">
-          <div className="w-20 h-20 rounded-full bg-discord-channels flex items-center justify-center text-3xl font-bold text-white shadow-xl">
-            {participant.username?.[0]?.toUpperCase() || 'P'}
-          </div>
-          <span className="text-xs text-discord-text-muted">
-            {participant.is_video_off
-              ? 'Cámara desactivada'
-              : !stream
-              ? 'Conectando video...'
-              : 'Esperando video...'}
-          </span>
-        </div>
-      )}
-
-      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2">
+      <div className="absolute bottom-3 left-3 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2">
         <span>{participant.username}</span>
         {participant.is_audio_muted ? (
           <MicOff className="w-3.5 h-3.5 text-discord-red" />
@@ -430,6 +449,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const peerConnectionsRef = useRef({});
   const localStreamRef = useRef(null);
   const pendingCandidatesRef = useRef({});
+  const makingOfferRef = useRef({});
 
   // Sidebar controls (Chat & Participants)
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -854,14 +874,28 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           console.warn(`[WebRTC] ICE failed with ${peerKey}, attempting restart`);
           if (pc.restartIce) {
             pc.restartIce();
-          } else if (shouldInitiateWith(peerKey)) {
-            initiatePeerConnection(peerKey);
           }
+        } else if (pc.iceConnectionState === 'closed') {
+          closePeerConnection(peerKey);
+          setParticipants((prev) => prev.filter((p) => String(p.user_id) !== peerKey));
         }
       };
 
       pc.onconnectionstatechange = () => {
         console.log(`[WebRTC] Connection state with ${peerKey}:`, pc.connectionState);
+        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+          closePeerConnection(peerKey);
+          setParticipants((prev) => prev.filter((p) => String(p.user_id) !== peerKey));
+        } else if (pc.connectionState === 'disconnected') {
+          setTimeout(() => {
+            const currentPc = peerConnectionsRef.current[peerKey];
+            if (currentPc && (currentPc.connectionState === 'disconnected' || currentPc.connectionState === 'failed')) {
+              console.log(`[WebRTC] Peer ${peerKey} remained disconnected, cleaning up.`);
+              closePeerConnection(peerKey);
+              setParticipants((prev) => prev.filter((p) => String(p.user_id) !== peerKey));
+            }
+          }, 4000);
+        }
       };
 
       pc.onsignalingstatechange = () => {
@@ -898,8 +932,8 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   };
 
   const initiatePeerConnection = async (targetUserId) => {
+    const peerKey = String(targetUserId);
     try {
-      const peerKey = String(targetUserId);
       const pc = getOrCreatePeerConnection(peerKey);
 
       if (pc.signalingState !== 'stable') {
@@ -914,6 +948,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         return;
       }
 
+      makingOfferRef.current[peerKey] = true;
       console.log(`[WebRTC] Initiating offer to peer ${peerKey}`);
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
@@ -929,6 +964,8 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       });
     } catch (err) {
       console.error(`[WebRTC] Error initiating peer connection with ${targetUserId}:`, err);
+    } finally {
+      makingOfferRef.current[peerKey] = false;
     }
   };
 
@@ -940,7 +977,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
       if (signalData.type === 'offer') {
         const isPolite = !shouldInitiateWith(peerKey);
-        const isCollision = pc.signalingState !== 'stable';
+        const isCollision = makingOfferRef.current[peerKey] || pc.signalingState !== 'stable';
 
         if (isCollision) {
           if (!isPolite) {
@@ -1478,9 +1515,40 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
   const handleEndOrLeave = async () => {
     setIsMinimized(false);
+
+    // 1. Notify WebSocket immediately
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'participant_leave',
+            user_id: String(user?.id),
+          })
+        );
+      } catch (e) {}
+    }
+
+    // 2. Call backend leave or end session endpoint
+    if (isHost) {
+      try {
+        await endSession(session.id);
+      } catch (err) {
+        console.warn('Error ending session:', err);
+      }
+    } else {
+      try {
+        await api.post(`/sessions/${session.id}/leave/`);
+      } catch (err) {
+        console.warn('Error leaving session:', err);
+      }
+    }
+
+    // 3. Close peer connections
     Object.keys(peerConnectionsRef.current).forEach((peerId) => {
       closePeerConnection(peerId);
     });
+
+    // 4. Stop media tracks
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
@@ -1488,18 +1556,35 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       localScreenStreamRef.current.getTracks().forEach((track) => track.stop());
       localScreenStreamRef.current = null;
     }
+
+    // 5. Close WS
     if (wsRef.current) {
       wsRef.current.close();
     }
-    if (isHost) {
-      try {
-        await endSession(session.id);
-      } catch (err) {
-        console.warn('Error ending session:', err);
-      }
-    }
+
+    leaveActiveSession(session.id);
     onLeave();
   };
+
+  // Ensure server knows if participant abruptly closes tab or window
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!isHost && session?.id) {
+        try {
+          const rawApi = import.meta.env.VITE_API_URL || '/api';
+          const cleanApi = rawApi.replace(/\/+$/, '');
+          const leaveUrl = `${cleanApi}/sessions/${session.id}/leave/`;
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(leaveUrl);
+          }
+        } catch (e) {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [session?.id, isHost]);
 
   // Helper to open/toggle sidebar to a specific tab
   const toggleSidebarTab = (tabName) => {

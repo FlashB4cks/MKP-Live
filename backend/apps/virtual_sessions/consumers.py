@@ -68,7 +68,8 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
             )
 
             # Only notify user_left if participant was in active room
-            if not getattr(self, 'is_waiting', False):
+            if not getattr(self, 'is_waiting', False) and hasattr(self, 'user') and self.user:
+                await self.mark_participant_left(self.session_id, self.user)
                 session_key = str(getattr(self, 'session_id', ''))
                 current_share = self.active_screen_shares.get(session_key)
                 if current_share and current_share.get('user_id') == str(self.user.id):
@@ -258,6 +259,35 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                     }
                 )
 
+            elif action == 'participant_leave':
+                await self.mark_participant_left(self.session_id, self.user)
+                session_key = str(self.session_id)
+                current_share = self.active_screen_shares.get(session_key)
+                if current_share and current_share.get('user_id') == str(self.user.id):
+                    self.active_screen_shares.pop(session_key, None)
+                    await self.channel_layer.group_send(
+                        self.session_group_name,
+                        {
+                            'type': 'session_event',
+                            'event_type': 'screen_share_status',
+                            'user_id': str(self.user.id),
+                            'username': self.user.username,
+                            'is_sharing': False,
+                            'has_audio': False,
+                            'stream_id': '',
+                        }
+                    )
+
+                await self.channel_layer.group_send(
+                    self.session_group_name,
+                    {
+                        'type': 'session_event',
+                        'event_type': 'user_left',
+                        'user_id': str(self.user.id),
+                        'username': self.user.username,
+                    }
+                )
+
         except json.JSONDecodeError:
             pass
 
@@ -338,4 +368,18 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
             content=content
         )
         return SessionMessageSerializer(msg).data
+
+    @database_sync_to_async
+    def mark_participant_left(self, session_id, user):
+        try:
+            session = VirtualSession.objects.filter(id=session_id).first()
+            if session and session.host_id != user.id:
+                SessionParticipant.objects.filter(
+                    session_id=session_id,
+                    user=user
+                ).update(
+                    status=ParticipantStatusChoices.LEFT
+                )
+        except Exception:
+            pass
 
