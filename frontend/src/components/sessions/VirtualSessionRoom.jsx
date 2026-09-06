@@ -35,11 +35,18 @@ const ICE_SERVERS = {
 
 function RemoteParticipantCard({ participant, stream }) {
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch((e) => console.warn('Autoplay prevented:', e));
+    if (stream) {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch((e) => console.warn('Video autoplay prevented:', e));
+      }
+      if (audioRef.current) {
+        audioRef.current.srcObject = stream;
+        audioRef.current.play().catch((e) => console.warn('Audio autoplay prevented:', e));
+      }
     }
   }, [stream]);
 
@@ -47,16 +54,16 @@ function RemoteParticipantCard({ participant, stream }) {
 
   return (
     <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-64 sm:h-72 lg:h-80">
-      {/* Remote Video Element: plays audio continuously even if camera is off */}
+      {/* Dedicated Remote Audio Playback Element: never interrupted by video toggles */}
+      <audio ref={audioRef} autoPlay playsInline />
+
+      {/* Remote Video Element: muted to prevent echo since audio is handled by dedicated audio tag */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        className={
-          showVideo
-            ? 'w-full h-full object-cover block'
-            : 'absolute w-0 h-0 opacity-0 pointer-events-none'
-        }
+        muted
+        className={`w-full h-full object-cover ${showVideo ? 'block' : 'hidden'}`}
       />
 
       {!showVideo && (
