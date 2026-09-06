@@ -25,6 +25,63 @@ import { useAuthStore } from '../../store/authStore';
 import { useSessionStore } from '../../store/sessionStore';
 import api from '../../api/client';
 
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+};
+
+function RemoteParticipantCard({ participant, stream }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch((e) => console.warn('Autoplay prevented:', e));
+    }
+  }, [stream]);
+
+  const showVideo = !participant.is_video_off && stream;
+
+  return (
+    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-64 sm:h-72 lg:h-80">
+      {/* Remote Video Element: plays audio continuously even if camera is off */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className={
+          showVideo
+            ? 'w-full h-full object-cover block'
+            : 'absolute w-0 h-0 opacity-0 pointer-events-none'
+        }
+      />
+
+      {!showVideo && (
+        <div className="flex flex-col items-center justify-center space-y-2">
+          <div className="w-20 h-20 rounded-full bg-discord-channels flex items-center justify-center text-3xl font-bold text-white shadow-xl">
+            {participant.username?.[0]?.toUpperCase() || 'P'}
+          </div>
+          <span className="text-xs text-discord-text-muted">
+            {participant.is_video_off ? 'Cámara desactivada' : 'Conectando video...'}
+          </span>
+        </div>
+      )}
+
+      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2">
+        <span>{participant.username}</span>
+        {participant.is_audio_muted ? (
+          <MicOff className="w-3.5 h-3.5 text-discord-red" />
+        ) : (
+          <Mic className="w-3.5 h-3.5 text-discord-green" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function VirtualSessionRoom({ session, onLeave }) {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
@@ -42,6 +99,12 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   // Remote participants and waiting room
   const [participants, setParticipants] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [remoteStreams, setRemoteStreams] = useState({});
+
+  // WebRTC Mesh refs
+  const peerConnectionsRef = useRef({});
+  const localStreamRef = useRef(null);
+  const pendingCandidatesRef = useRef({});
 
   // Sidebar controls (Chat & Participants)
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -57,11 +120,175 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
   const isHost = session.host?.id === user?.id || session.is_host;
 
-  // 1. Initial Fetch of participants, pending requests & chat messages from DB
+  // Helper to determine deterministic initiator
+  const shouldInitiateWith = (otherUserId) => {
+    if (!user?.id || !otherUserId) return false;
+    return String(user.id) > String(otherUserId);
+  };
+
+  const sendSignal = (targetUserId, signalData) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: 'signal',
+          target_user_id: targetUserId,
+          signal_data: signalData,
+        })
+      );
+    }
+  };
+
+  const closePeerConnection = (targetUserId) => {
+    if (peerConnectionsRef.current[targetUserId]) {
+      try {
+        peerConnectionsRef.current[targetUserId].close();
+      } catch (e) {
+        // ignore
+      }
+      delete peerConnectionsRef.current[targetUserId];
+    }
+    delete pendingCandidatesRef.current[targetUserId];
+    setRemoteStreams((prev) => {
+      const next = { ...prev };
+      delete next[targetUserId];
+      return next;
+    });
+  };
+
+  const getOrCreatePeerConnection = (targetUserId) => {
+    if (peerConnectionsRef.current[targetUserId]) {
+      return peerConnectionsRef.current[targetUserId];
+    }
+
+    const pc = new RTCPeerConnection(ICE_SERVERS);
+    peerConnectionsRef.current[targetUserId] = pc;
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal(targetUserId, {
+          type: 'candidate',
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        setRemoteStreams((prev) => ({
+          ...prev,
+          [targetUserId]: event.streams[0],
+        }));
+      } else {
+        setRemoteStreams((prev) => {
+          const current = prev[targetUserId] || new MediaStream();
+          current.addTrack(event.track);
+          return { ...prev, [targetUserId]: current };
+        });
+      }
+    };
+
+    return pc;
+  };
+
+  const initiatePeerConnection = async (targetUserId) => {
+    try {
+      const pc = getOrCreatePeerConnection(targetUserId);
+      if (pc.signalingState !== 'stable') return;
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+      await pc.setLocalDescription(offer);
+      sendSignal(targetUserId, {
+        type: 'offer',
+        sdp: pc.localDescription,
+      });
+    } catch (err) {
+      console.error(`Error initiating peer connection with ${targetUserId}:`, err);
+    }
+  };
+
+  const handleSignalMessage = async (fromUserId, signalData) => {
+    try {
+      const pc = getOrCreatePeerConnection(fromUserId);
+
+      if (signalData.type === 'offer') {
+        if (pc.signalingState !== 'stable') {
+          if (!shouldInitiateWith(fromUserId)) {
+            await Promise.all([
+              pc.setLocalDescription({ type: 'rollback' }).catch(() => {}),
+              pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp)),
+            ]);
+          } else {
+            return;
+          }
+        } else {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
+        }
+
+        if (pendingCandidatesRef.current[fromUserId]) {
+          for (const cand of pendingCandidatesRef.current[fromUserId]) {
+            await pc.addIceCandidate(new RTCIceCandidate(cand)).catch((e) =>
+              console.warn('Queued ICE candidate error:', e)
+            );
+          }
+          delete pendingCandidatesRef.current[fromUserId];
+        }
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+
+        sendSignal(fromUserId, {
+          type: 'answer',
+          sdp: pc.localDescription,
+        });
+      } else if (signalData.type === 'answer') {
+        if (pc.signalingState === 'have-local-offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(signalData.sdp));
+
+          if (pendingCandidatesRef.current[fromUserId]) {
+            for (const cand of pendingCandidatesRef.current[fromUserId]) {
+              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch((e) =>
+                console.warn('Queued ICE candidate error:', e)
+              );
+            }
+            delete pendingCandidatesRef.current[fromUserId];
+          }
+        }
+      } else if (signalData.type === 'candidate' && signalData.candidate) {
+        if (pc.remoteDescription && pc.remoteDescription.type) {
+          await pc.addIceCandidate(new RTCIceCandidate(signalData.candidate)).catch((e) =>
+            console.warn('Error adding ICE candidate:', e)
+          );
+        } else {
+          if (!pendingCandidatesRef.current[fromUserId]) {
+            pendingCandidatesRef.current[fromUserId] = [];
+          }
+          pendingCandidatesRef.current[fromUserId].push(signalData.candidate);
+        }
+      }
+    } catch (err) {
+      console.error(`Error handling WebRTC signal from ${fromUserId}:`, err);
+    }
+  };
+
+  // 1. Initial Fetch and Periodic Sync of participants & messages
   const refreshSessionData = async () => {
     try {
       const res = await api.get(`/sessions/${session.id}/`);
       const data = res.data;
+
+      if (data.status === 'ENDED') {
+        handleEndOrLeave();
+        return;
+      }
+
       if (data.participants) {
         const accepted = data.participants
           .filter((p) => p.status === 'ACCEPTED' && p.user.id !== user?.id)
@@ -72,6 +299,21 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             is_video_off: p.is_video_off,
           }));
         setParticipants(accepted);
+
+        // Check if any participant needs peer connection initiation
+        accepted.forEach((p) => {
+          if (!peerConnectionsRef.current[p.user_id] && shouldInitiateWith(p.user_id)) {
+            initiatePeerConnection(p.user_id);
+          }
+        });
+
+        // Clean up connections for participants who left
+        const acceptedIds = new Set(accepted.map((p) => p.user_id));
+        Object.keys(peerConnectionsRef.current).forEach((peerId) => {
+          if (!acceptedIds.has(peerId)) {
+            closePeerConnection(peerId);
+          }
+        });
 
         if (isHost) {
           const pending = data.participants
@@ -96,12 +338,12 @@ export default function VirtualSessionRoom({ session, onLeave }) {
     refreshSessionData();
   }, [session.id, user?.id, isHost]);
 
-  // Periodic polling for Host every 3 seconds to ensure real-time consistency
+  // Periodic polling every 3 seconds for ALL participants to ensure state consistency
   useEffect(() => {
-    if (!isHost || !session?.id) return;
+    if (!session?.id) return;
     const interval = setInterval(refreshSessionData, 3000);
     return () => clearInterval(interval);
-  }, [session.id, isHost]);
+  }, [session.id, user?.id, isHost]);
 
   // Auto-scroll to bottom of chat when new messages arrive and chat is visible
   useEffect(() => {
@@ -121,12 +363,26 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           audio: true,
         });
         setStream(localStream);
+        localStreamRef.current = localStream;
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStream;
         }
         if (minimizedVideoRef.current) {
           minimizedVideoRef.current.srcObject = localStream;
         }
+
+        // Attach local tracks to any already created peer connections
+        Object.entries(peerConnectionsRef.current).forEach(([peerId, pc]) => {
+          localStream.getTracks().forEach((track) => {
+            const senders = pc.getSenders();
+            if (!senders.some((s) => s.track === track)) {
+              pc.addTrack(track, localStream);
+            }
+          });
+          if (shouldInitiateWith(peerId)) {
+            initiatePeerConnection(peerId);
+          }
+        });
       } catch (err) {
         console.warn('Could not access camera/mic, falling back to virtual mode:', err);
         setMediaError('Cámara o micrófono no disponibles. Operando en modo virtual.');
@@ -169,7 +425,9 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       try {
         const data = JSON.parse(event.data);
 
-        if (data.type === 'session_event') {
+        if (data.type === 'signal') {
+          handleSignalMessage(data.from_user_id, data.signal_data);
+        } else if (data.type === 'session_event') {
           if (data.event_type === 'chat_message') {
             setMessages((prev) => {
               if (prev.some((m) => m.id === data.message.id)) return prev;
@@ -177,6 +435,24 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             });
             if (!sidebarOpen || sidebarTab !== 'chat') {
               setUnreadCount((c) => c + 1);
+            }
+          } else if (data.event_type === 'user_joined') {
+            if (data.user_id !== user?.id) {
+              setParticipants((prev) => {
+                if (prev.some((p) => p.user_id === data.user_id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    user_id: data.user_id,
+                    username: data.username || 'Participante',
+                    is_audio_muted: false,
+                    is_video_off: false,
+                  },
+                ];
+              });
+              if (shouldInitiateWith(data.user_id)) {
+                initiatePeerConnection(data.user_id);
+              }
             }
           } else if (data.event_type === 'join_requested') {
             if (isHost) {
@@ -189,18 +465,23 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             }
           } else if (data.event_type === 'participant_approved') {
             setPendingRequests((prev) => prev.filter((p) => p.user_id !== data.user_id));
-            setParticipants((prev) => {
-              if (prev.some((p) => p.user_id === data.user_id)) return prev;
-              return [
-                ...prev,
-                {
-                  user_id: data.user_id,
-                  username: data.username || 'Participante',
-                  is_audio_muted: false,
-                  is_video_off: false,
-                },
-              ];
-            });
+            if (data.user_id !== user?.id) {
+              setParticipants((prev) => {
+                if (prev.some((p) => p.user_id === data.user_id)) return prev;
+                return [
+                  ...prev,
+                  {
+                    user_id: data.user_id,
+                    username: data.username || 'Participante',
+                    is_audio_muted: false,
+                    is_video_off: false,
+                  },
+                ];
+              });
+              if (shouldInitiateWith(data.user_id)) {
+                initiatePeerConnection(data.user_id);
+              }
+            }
           } else if (data.event_type === 'participant_rejected') {
             setPendingRequests((prev) => prev.filter((p) => p.user_id !== data.user_id));
           } else if (data.event_type === 'media_state_changed') {
@@ -212,8 +493,11 @@ export default function VirtualSessionRoom({ session, onLeave }) {
               )
             );
           } else if (data.event_type === 'user_left') {
+            closePeerConnection(data.user_id);
             setParticipants((prev) => prev.filter((p) => p.user_id !== data.user_id));
             setPendingRequests((prev) => prev.filter((p) => p.user_id !== data.user_id));
+          } else if (data.event_type === 'session_ended') {
+            handleEndOrLeave();
           }
         }
       } catch (err) {
@@ -226,7 +510,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         wsRef.current.close();
       }
     };
-  }, [session.id, token, isHost, sidebarOpen, sidebarTab]);
+  }, [session.id, token, isHost, user?.id, sidebarOpen, sidebarTab]);
 
   // Toggle Microphone
   const toggleAudio = () => {
@@ -338,8 +622,21 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
   const handleEndOrLeave = async () => {
     setIsMinimized(false);
+    Object.keys(peerConnectionsRef.current).forEach((peerId) => {
+      closePeerConnection(peerId);
+    });
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
     if (isHost) {
-      await endSession(session.id);
+      try {
+        await endSession(session.id);
+      } catch (err) {
+        console.warn('Error ending session:', err);
+      }
     }
     onLeave();
   };
@@ -364,6 +661,22 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   if (isMinimized) {
     return (
       <div className="fixed bottom-5 right-5 z-50 w-80 sm:w-96 rounded-2xl bg-discord-chat shadow-2xl border-2 border-discord-blurple overflow-hidden flex flex-col select-none transition-all duration-300 ring-4 ring-black/40 animate-in fade-in slide-in-from-bottom-5">
+        {/* Keep remote audio streams active while minimized */}
+        <div className="sr-only">
+          {participants.map((p) => (
+            <audio
+              key={p.user_id}
+              ref={(el) => {
+                if (el && remoteStreams[p.user_id] && el.srcObject !== remoteStreams[p.user_id]) {
+                  el.srcObject = remoteStreams[p.user_id];
+                  el.play().catch(() => {});
+                }
+              }}
+              autoPlay
+              playsInline
+            />
+          ))}
+        </div>
         {/* Minimized Header */}
         <div className="bg-discord-sidebar px-3 py-2.5 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center space-x-2 min-w-0">
@@ -712,34 +1025,11 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
             {/* Remote Participants Video Cards */}
             {participants.map((participant) => (
-              <div
+              <RemoteParticipantCard
                 key={participant.user_id}
-                className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-64 sm:h-72 lg:h-80"
-              >
-                {participant.is_video_off ? (
-                  <div className="flex flex-col items-center justify-center space-y-2">
-                    <div className="w-20 h-20 rounded-full bg-discord-channels flex items-center justify-center text-3xl font-bold text-white shadow-xl">
-                      {participant.username?.[0]?.toUpperCase() || 'P'}
-                    </div>
-                    <span className="text-xs text-discord-text-muted">Cámara desactivada</span>
-                  </div>
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-discord-sidebar to-discord-channels flex items-center justify-center">
-                    <div className="w-20 h-20 rounded-full bg-discord-blurple flex items-center justify-center text-2xl font-bold text-white">
-                      {participant.username?.[0]?.toUpperCase()}
-                    </div>
-                  </div>
-                )}
-
-                <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2">
-                  <span>{participant.username}</span>
-                  {participant.is_audio_muted ? (
-                    <MicOff className="w-3.5 h-3.5 text-discord-red" />
-                  ) : (
-                    <Mic className="w-3.5 h-3.5 text-discord-green" />
-                  )}
-                </div>
-              </div>
+                participant={participant}
+                stream={remoteStreams[participant.user_id]}
+              />
             ))}
           </div>
         </main>

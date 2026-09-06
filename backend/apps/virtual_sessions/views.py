@@ -154,6 +154,18 @@ class EndSessionView(APIView):
             )
         session.status = SessionStatusChoices.ENDED
         session.save(update_fields=['status', 'updated_at'])
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"session_{session.id}",
+                    {
+                        'type': 'session_event',
+                        'event_type': 'session_ended',
+                    }
+                )
+            except Exception:
+                pass
         return Response({"detail": "Sesión finalizada correctamente."})
 
 class RequestJoinSessionView(APIView):

@@ -20,6 +20,10 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
         self.session_id = self.scope['url_route']['kwargs']['session_id']
         self.session_group_name = f"session_{self.session_id}"
 
+        # Check if this connection is only for waiting room
+        query_string = self.scope.get('query_string', b'').decode('utf-8')
+        self.is_waiting = 'waiting=true' in query_string
+
         # Join session group
         await self.channel_layer.group_add(
             self.session_group_name,
@@ -28,16 +32,17 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-        # Notify participants
-        await self.channel_layer.group_send(
-            self.session_group_name,
-            {
-                'type': 'session_event',
-                'event_type': 'user_joined',
-                'user_id': str(self.user.id),
-                'username': self.user.username,
-            }
-        )
+        # Only notify user_joined if entering active room (not waiting room)
+        if not self.is_waiting:
+            await self.channel_layer.group_send(
+                self.session_group_name,
+                {
+                    'type': 'session_event',
+                    'event_type': 'user_joined',
+                    'user_id': str(self.user.id),
+                    'username': self.user.username,
+                }
+            )
 
     async def disconnect(self, close_code):
         if hasattr(self, 'session_group_name'):
@@ -46,15 +51,17 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
-            await self.channel_layer.group_send(
-                self.session_group_name,
-                {
-                    'type': 'session_event',
-                    'event_type': 'user_left',
-                    'user_id': str(self.user.id),
-                    'username': self.user.username,
-                }
-            )
+            # Only notify user_left if participant was in active room
+            if not getattr(self, 'is_waiting', False):
+                await self.channel_layer.group_send(
+                    self.session_group_name,
+                    {
+                        'type': 'session_event',
+                        'event_type': 'user_left',
+                        'user_id': str(self.user.id),
+                        'username': self.user.username,
+                    }
+                )
 
     async def receive(self, text_data):
         try:
@@ -111,7 +118,7 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                 target_user_id = data.get('target_user_id')
                 status_action = data.get('status', 'ACCEPTED')
 
-                await self.set_participant_status(self.session_id, target_user_id, status_action)
+                target_username = await self.set_participant_status(self.session_id, target_user_id, status_action)
 
                 await self.channel_layer.group_send(
                     self.session_group_name,
@@ -119,6 +126,7 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                         'type': 'session_event',
                         'event_type': 'participant_approved' if status_action == 'ACCEPTED' else 'participant_rejected',
                         'user_id': target_user_id,
+                        'username': target_username or 'Participante',
                         'status': status_action,
                     }
                 )
@@ -167,10 +175,15 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def set_participant_status(self, session_id, user_id, status_action):
-        SessionParticipant.objects.filter(
+        p = SessionParticipant.objects.filter(
             session_id=session_id,
             user_id=user_id
-        ).update(status=status_action)
+        ).select_related('user').first()
+        if p:
+            p.status = status_action
+            p.save(update_fields=['status', 'updated_at'])
+            return p.user.username
+        return None
 
     @database_sync_to_async
     def save_session_message(self, session_id, user, content):

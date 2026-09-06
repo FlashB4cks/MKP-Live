@@ -20,7 +20,7 @@ export default function WaitingRoomModal({ isOpen, onLeave, session, onApproved 
     const rawHost = import.meta.env.VITE_WS_URL || window.location.host;
     const cleanHost = rawHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '').replace(/\/+$/, '');
     const protocol = window.location.protocol === 'https:' || rawHost.startsWith('https:') || rawHost.startsWith('wss:') ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${cleanHost}/ws/sessions/${session.id}/?token=${token}`;
+    const wsUrl = `${protocol}//${cleanHost}/ws/sessions/${session.id}/?token=${token}&waiting=true`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

@@ -7,7 +7,13 @@ admin.site.site_header = "MKP Live Administración"
 admin.site.site_title = "MKP Live Portal"
 admin.site.index_title = "Panel de Control MKP Live"
 
+from django.http import JsonResponse
+
+def health_check(request):
+    return JsonResponse({'status': 'ok', 'app': 'MKP Live', 'version': '1.0.0'})
+
 urlpatterns = [
+    path('', health_check, name='health_check'),
     path('admin/', admin.site.urls),
 
     # Standard API endpoints with /api/ prefix
