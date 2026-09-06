@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Send, Wifi, WifiOff, Plus, User, Clock, Check, CheckCheck } from 'lucide-react';
+import { MessageSquare, Send, Wifi, WifiOff, Plus, User, Clock, Check, CheckCheck, Menu } from 'lucide-react';
 import { useDMStore } from '../../store/dmStore';
 import { useAuthStore } from '../../store/authStore';
 import { useDMWebSocket } from '../../hooks/useDMWebSocket';
 import StartDMModal from '../modals/StartDMModal';
 
-export default function DirectMessageArea() {
+export default function DirectMessageArea({ onOpenMobileNav }) {
   const activeConversation = useDMStore((state) => state.activeConversation);
   const conversations = useDMStore((state) => state.conversations);
   const messages = useDMStore((state) => state.messages);
@@ -89,20 +89,29 @@ export default function DirectMessageArea() {
   // If no conversation is selected, render the DM Home View
   if (!activeConversation) {
     return (
-      <main className="flex-1 bg-discord-chat flex flex-col items-center justify-center p-6 text-center select-none">
-        <div className="w-20 h-20 rounded-3xl bg-discord-blurple/20 border border-discord-blurple/30 flex items-center justify-center mb-5 text-discord-blurple shadow-xl">
-          <MessageSquare className="w-10 h-10" />
+      <main className="flex-1 bg-discord-chat flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none">
+        {onOpenMobileNav && (
+          <button
+            onClick={onOpenMobileNav}
+            className="md:hidden mb-4 px-4 py-2 bg-discord-blurple text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow"
+          >
+            <Menu className="w-4 h-4" />
+            <span>Ver chats y servidores</span>
+          </button>
+        )}
+        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-discord-blurple/20 border border-discord-blurple/30 flex items-center justify-center mb-4 sm:mb-5 text-discord-blurple shadow-xl">
+          <MessageSquare className="w-8 h-8 sm:w-10 sm:h-10" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">
+        <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
           Mensajes Directos en MKP Live
         </h2>
-        <p className="text-sm text-discord-text-muted max-w-md mb-6 leading-relaxed">
+        <p className="text-xs sm:text-sm text-discord-text-muted max-w-md mb-6 leading-relaxed">
           Comunícate en privado y en tiempo real con cualquier usuario registrado. Busca a un compañero o continúa una conversación pendiente.
         </p>
 
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl font-semibold text-sm transition shadow-md flex items-center gap-2"
+          className="px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           <span>Iniciar nuevo mensaje directo</span>
@@ -110,7 +119,7 @@ export default function DirectMessageArea() {
 
         {/* Recent DM list preview */}
         {conversations.length > 0 && (
-          <div className="mt-10 w-full max-w-md text-left">
+          <div className="mt-8 sm:mt-10 w-full max-w-md text-left">
             <h4 className="text-xs font-bold text-discord-text-muted uppercase tracking-wider mb-3 px-1">
               Conversaciones recientes
             </h4>
@@ -121,11 +130,11 @@ export default function DirectMessageArea() {
                   <div
                     key={conv.id}
                     onClick={() => selectConversation(conv)}
-                    className="flex items-center justify-between p-3 rounded-xl bg-discord-sidebar/60 hover:bg-discord-hover transition cursor-pointer border border-white/5 group"
+                    className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-discord-sidebar/60 hover:bg-discord-hover transition cursor-pointer border border-white/5 group"
                   >
                     <div className="flex items-center space-x-3 min-w-0">
                       <div className="relative flex-shrink-0">
-                        <div className="w-9 h-9 rounded-full bg-discord-blurple flex items-center justify-center text-xs font-bold text-white">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-discord-blurple flex items-center justify-center text-xs font-bold text-white">
                           {partner?.avatar_url ? (
                             <img
                               src={partner.avatar_url}
@@ -141,10 +150,10 @@ export default function DirectMessageArea() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block truncate">
+                        <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block truncate max-w-[140px] sm:max-w-xs">
                           @{partner?.username || 'Usuario'}
                         </span>
-                        <span className="text-[11px] text-discord-text-muted truncate block">
+                        <span className="text-[11px] text-discord-text-muted truncate block max-w-[140px] sm:max-w-xs">
                           {conv.last_message?.content || 'Sin mensajes aún'}
                         </span>
                       </div>
@@ -170,10 +179,21 @@ export default function DirectMessageArea() {
   return (
     <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-text">
       {/* Header Bar */}
-      <header className="h-12 border-b border-black/20 px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
-        <div className="flex items-center space-x-3 min-w-0">
+      <header className="h-12 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+          {/* Mobile Hamburger Menu Button */}
+          {onOpenMobileNav && (
+            <button
+              onClick={onOpenMobileNav}
+              className="md:hidden p-1.5 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-lg transition mr-1"
+              title="Abrir mensajes y servidores"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
           <div className="relative flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-discord-blurple flex items-center justify-center text-xs font-bold text-white overflow-hidden">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-discord-blurple flex items-center justify-center text-xs font-bold text-white overflow-hidden">
               {otherUser.avatar_url ? (
                 <img
                   src={otherUser.avatar_url}
@@ -193,15 +213,15 @@ export default function DirectMessageArea() {
 
           <div className="min-w-0">
             <div className="flex items-center space-x-2">
-              <span className="font-bold text-white text-sm truncate">
+              <span className="font-bold text-white text-sm truncate max-w-[120px] sm:max-w-xs">
                 @{otherUser.username}
               </span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-discord-text-muted">
+              <span className="text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-discord-text-muted hidden xs:inline">
                 Mensaje Directo
               </span>
             </div>
             {otherUser.status_text && (
-              <span className="text-[10px] text-discord-text-muted truncate block">
+              <span className="text-[10px] text-discord-text-muted truncate block max-w-[120px] sm:max-w-xs">
                 {otherUser.status_text}
               </span>
             )}
@@ -330,10 +350,10 @@ export default function DirectMessageArea() {
       </div>
 
       {/* Message Input Box */}
-      <div className="px-4 pb-4 flex-shrink-0 select-none">
+      <div className="px-2 sm:px-4 pb-2 sm:pb-4 flex-shrink-0 select-none">
         <form
           onSubmit={handleSendMessage}
-          className="bg-discord-input rounded-lg px-4 py-2.5 flex items-center space-x-3 shadow-inner"
+          className="bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner"
         >
           <input
             type="text"

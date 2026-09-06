@@ -53,7 +53,7 @@ function RemoteParticipantCard({ participant, stream }) {
   const showVideo = !participant.is_video_off && stream;
 
   return (
-    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-64 sm:h-72 lg:h-80">
+    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-44 sm:h-64 lg:h-80">
       {/* Dedicated Remote Audio Playback Element: never interrupted by video toggles */}
       <audio ref={audioRef} autoPlay playsInline />
 
@@ -667,7 +667,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   // ==========================================
   if (isMinimized) {
     return (
-      <div className="fixed bottom-5 right-5 z-50 w-80 sm:w-96 rounded-2xl bg-discord-chat shadow-2xl border-2 border-discord-blurple overflow-hidden flex flex-col select-none transition-all duration-300 ring-4 ring-black/40 animate-in fade-in slide-in-from-bottom-5">
+      <div className="fixed bottom-3 right-3 left-3 sm:left-auto sm:right-5 sm:bottom-5 z-50 w-auto sm:w-96 max-w-sm rounded-2xl bg-discord-chat shadow-2xl border-2 border-discord-blurple overflow-hidden flex flex-col select-none transition-all duration-300 ring-4 ring-black/40 animate-in fade-in slide-in-from-bottom-5">
         {/* Keep remote audio streams active while minimized */}
         <div className="sr-only">
           {participants.map((p) => (
@@ -839,29 +839,29 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           {/* Prominent Back to Chat / Minimize Button */}
           <button
             onClick={() => setIsMinimized(true)}
-            className="flex items-center space-x-1.5 bg-discord-channels hover:bg-discord-hover text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition border border-white/10 shadow-sm"
+            className="flex items-center space-x-1 sm:space-x-1.5 bg-discord-channels hover:bg-discord-hover text-white text-xs font-semibold px-2.5 sm:px-3 py-1.5 rounded-lg transition border border-white/10 shadow-sm flex-shrink-0"
             title="Regresar al chat de texto y minimizar la reunión en una ventana pequeña"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="font-bold">Volver al chat</span>
+            <span className="font-bold hidden sm:inline">Volver al chat</span>
           </button>
 
           <div className="w-[1px] h-6 bg-white/10 hidden sm:block" />
 
           <div className="flex items-center space-x-2 min-w-0">
-            <div className="p-1.5 rounded-lg bg-discord-blurple/20 text-discord-blurple">
+            <div className="p-1.5 rounded-lg bg-discord-blurple/20 text-discord-blurple flex-shrink-0">
               <Video className="w-4 h-4" />
             </div>
-            <div>
-              <h1 className="font-bold text-sm text-white flex items-center gap-2 truncate">
-                <span>{session.title}</span>
+            <div className="min-w-0">
+              <h1 className="font-bold text-sm text-white flex items-center gap-1.5 sm:gap-2 truncate">
+                <span className="truncate max-w-[110px] sm:max-w-xs md:max-w-md">{session.title}</span>
                 {isHost && (
-                  <span className="text-[10px] bg-discord-yellow/20 text-discord-yellow px-2 py-0.5 rounded font-bold flex items-center gap-1">
-                    <Crown className="w-3 h-3" /> Anfitrión
+                  <span className="text-[9px] sm:text-[10px] bg-discord-yellow/20 text-discord-yellow px-1.5 sm:px-2 py-0.5 rounded font-bold flex items-center gap-1 flex-shrink-0">
+                    <Crown className="w-3 h-3" /> <span className="hidden xs:inline">Anfitrión</span>
                   </span>
                 )}
               </h1>
-              <p className="text-[10px] text-discord-text-muted truncate">
+              <p className="text-[10px] text-discord-text-muted truncate max-w-[120px] sm:max-w-xs hidden xs:block">
                 {session.description || 'Videoconferencia segura'}
               </p>
             </div>
@@ -1000,9 +1000,9 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             </div>
           )}
 
-          <div className="w-full h-full max-h-[75vh] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto items-center">
+          <div className="w-full h-full max-h-[75vh] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4 max-w-6xl mx-auto items-center">
             {/* Local User Video Card */}
-            <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-64 sm:h-72 lg:h-80">
+            <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-44 sm:h-64 lg:h-80">
               <video
                 ref={localVideoRef}
                 autoPlay
@@ -1013,7 +1013,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
               {isVideoOff && (
                 <div className="flex flex-col items-center justify-center space-y-2">
-                  <div className="w-20 h-20 rounded-full bg-discord-blurple flex items-center justify-center text-3xl font-bold text-white shadow-xl">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-discord-blurple flex items-center justify-center text-2xl sm:text-3xl font-bold text-white shadow-xl">
                     {user?.username?.[0]?.toUpperCase() || 'Tú'}
                   </div>
                   <span className="text-xs text-discord-text-muted">Cámara desactivada</span>
@@ -1043,7 +1043,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
         {/* Right Toggleable Sidebar: Chat & Participants Panel */}
         {sidebarOpen && (
-          <aside className="w-80 sm:w-96 bg-discord-sidebar border-l border-black/40 flex flex-col h-full shadow-2xl flex-shrink-0 z-20 transition-all duration-300">
+          <aside className="fixed inset-0 z-50 sm:static sm:z-20 sm:w-80 lg:w-96 bg-discord-sidebar border-l border-black/40 flex flex-col h-full shadow-2xl flex-shrink-0 transition-all duration-300">
             {/* Sidebar Top Tabs Bar */}
             <div className="p-2 border-b border-white/10 flex items-center justify-between bg-discord-chat/40">
               <div className="flex items-center space-x-1">
@@ -1323,49 +1323,49 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       </div>
 
       {/* 4. Bottom Controls Bar */}
-      <footer className="h-20 bg-discord-sidebar px-6 flex items-center justify-center space-x-3 sm:space-x-4 border-t border-black/40 flex-shrink-0">
+      <footer className="h-16 sm:h-20 bg-discord-sidebar px-2 sm:px-6 flex items-center justify-center space-x-1 sm:space-x-3 md:space-x-4 border-t border-black/40 flex-shrink-0">
         {/* Toggle Microphone */}
         <button
           onClick={toggleAudio}
-          className={`flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition shadow-lg ${
+          className={`flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition shadow-lg ${
             isAudioMuted
               ? 'bg-discord-red text-white hover:bg-discord-red/90'
               : 'bg-discord-channels text-white hover:bg-discord-hover'
           }`}
           title={isAudioMuted ? 'Activar micrófono' : 'Desactivar micrófono'}
         >
-          {isAudioMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-          <span className="text-[9px] mt-1 font-medium">{isAudioMuted ? 'Silenciado' : 'Mic'}</span>
+          {isAudioMuted ? <MicOff className="w-4 h-4 sm:w-6 sm:h-6" /> : <Mic className="w-4 h-4 sm:w-6 sm:h-6" />}
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">{isAudioMuted ? 'Silencio' : 'Mic'}</span>
         </button>
 
         {/* Toggle Camera */}
         <button
           onClick={toggleVideo}
-          className={`flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition shadow-lg ${
+          className={`flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition shadow-lg ${
             isVideoOff
               ? 'bg-discord-red text-white hover:bg-discord-red/90'
               : 'bg-discord-channels text-white hover:bg-discord-hover'
           }`}
           title={isVideoOff ? 'Activar cámara' : 'Desactivar cámara'}
         >
-          {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
-          <span className="text-[9px] mt-1 font-medium">{isVideoOff ? 'Cámara off' : 'Cámara'}</span>
+          {isVideoOff ? <VideoOff className="w-4 h-4 sm:w-6 sm:h-6" /> : <Video className="w-4 h-4 sm:w-6 sm:h-6" />}
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">{isVideoOff ? 'Cámara off' : 'Cámara'}</span>
         </button>
 
         {/* Toggle In-Meeting Chat Sidebar (Available to Host & All Members) */}
         <button
           onClick={() => toggleSidebarTab('chat')}
-          className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition shadow-lg ${
+          className={`relative flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition shadow-lg ${
             sidebarOpen && sidebarTab === 'chat'
               ? 'bg-discord-blurple text-white ring-2 ring-discord-blurple/50'
               : 'bg-discord-channels text-white hover:bg-discord-hover'
           }`}
           title="Abrir chat de la reunión"
         >
-          <MessageSquare className="w-6 h-6" />
-          <span className="text-[9px] mt-1 font-medium">Chat</span>
+          <MessageSquare className="w-4 h-4 sm:w-6 sm:h-6" />
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">Chat</span>
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-discord-red text-white text-[10px] font-bold animate-bounce shadow">
+            <span className="absolute -top-1 -right-1 px-1 sm:px-1.5 py-0.2 sm:py-0.5 rounded-full bg-discord-red text-white text-[9px] sm:text-[10px] font-bold animate-bounce shadow">
               {unreadCount}
             </span>
           )}
@@ -1374,35 +1374,35 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         {/* Toggle Participants / Waiting Room Sidebar */}
         <button
           onClick={() => toggleSidebarTab('participants')}
-          className={`flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition shadow-lg ${
+          className={`flex flex-col items-center justify-center w-11 h-11 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl transition shadow-lg ${
             sidebarOpen && sidebarTab === 'participants'
               ? 'bg-discord-blurple text-white ring-2 ring-discord-blurple/50'
               : 'bg-discord-channels text-white hover:bg-discord-hover'
           }`}
           title={isHost ? 'Ver integrantes y sala de espera' : 'Ver integrantes'}
         >
-          <Users className="w-6 h-6" />
-          <span className="text-[9px] mt-1 font-medium">Personas</span>
+          <Users className="w-4 h-4 sm:w-6 sm:h-6" />
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-medium">Personas</span>
         </button>
 
         {/* Return to Chat / Minimize to Floating PiP */}
         <button
           onClick={() => setIsMinimized(true)}
-          className="flex flex-col items-center justify-center px-4 h-14 rounded-2xl bg-discord-channels hover:bg-discord-hover text-white transition shadow-lg border border-white/10"
+          className="flex flex-col items-center justify-center px-2.5 sm:px-4 h-11 sm:h-14 rounded-xl sm:rounded-2xl bg-discord-channels hover:bg-discord-hover text-white transition shadow-lg border border-white/10"
           title="Minimizar reunión a ventana pequeña para volver al chat de texto"
         >
-          <Minimize2 className="w-5 h-5 text-discord-blurple" />
-          <span className="text-[9px] mt-1 font-semibold text-white">Minimizar</span>
+          <Minimize2 className="w-4 h-4 sm:w-5 sm:h-5 text-discord-blurple" />
+          <span className="text-[8px] sm:text-[9px] mt-0.5 sm:mt-1 font-semibold text-white">Minimizar</span>
         </button>
 
         {/* Leave or End Session */}
         <button
           onClick={handleEndOrLeave}
-          className="flex flex-col items-center justify-center px-5 h-14 rounded-2xl bg-discord-red text-white hover:bg-discord-red/90 transition shadow-lg ml-1"
+          className="flex flex-col items-center justify-center px-3 sm:px-5 h-11 sm:h-14 rounded-xl sm:rounded-2xl bg-discord-red text-white hover:bg-discord-red/90 transition shadow-lg ml-0.5 sm:ml-1"
           title={isHost ? 'Finalizar sesión para todos' : 'Salir de la reunión'}
         >
-          <PhoneOff className="w-6 h-6" />
-          <span className="text-[10px] mt-1 font-bold">
+          <PhoneOff className="w-4 h-4 sm:w-6 sm:h-6" />
+          <span className="text-[8px] sm:text-[10px] mt-0.5 sm:mt-1 font-bold">
             {isHost ? 'Finalizar' : 'Salir'}
           </span>
         </button>

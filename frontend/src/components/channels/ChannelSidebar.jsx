@@ -9,6 +9,7 @@ import {
   Volume2,
   Trash2,
   MessageSquare,
+  X,
 } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useAuthStore } from '../../store/authStore';
@@ -18,7 +19,7 @@ import InviteModal from '../modals/InviteModal';
 import ConfirmModal from '../modals/ConfirmModal';
 import StartDMModal from '../modals/StartDMModal';
 
-export default function ChannelSidebar() {
+export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
   const activeServer = useServerStore((state) => state.activeServer);
   const activeChannel = useServerStore((state) => state.activeChannel);
   const selectChannel = useServerStore((state) => state.selectChannel);
@@ -88,17 +89,28 @@ export default function ChannelSidebar() {
       <div>
         {activeServer ? (
           <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="w-full h-12 px-4 flex items-center justify-between border-b border-black/20 hover:bg-discord-hover transition text-white font-semibold text-sm shadow-sm"
-            >
-              <span className="truncate">{activeServer.name}</span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${
-                  dropdownOpen ? 'rotate-180' : ''
-                }`}
-              />
-            </button>
+            <div className="w-full h-12 px-3 sm:px-4 flex items-center justify-between border-b border-black/20 hover:bg-discord-hover transition text-white font-semibold text-sm shadow-sm">
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center justify-between flex-1 min-w-0 mr-2 text-left"
+              >
+                <span className="truncate">{activeServer.name}</span>
+                <ChevronDown
+                  className={`w-4 h-4 ml-1 flex-shrink-0 transition-transform duration-200 ${
+                    dropdownOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              {onCloseMobile && (
+                <button
+                  onClick={onCloseMobile}
+                  className="md:hidden p-1 text-discord-text-muted hover:text-white rounded transition"
+                  title="Cerrar navegación"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
 
             {/* Dropdown Menu */}
             {dropdownOpen && (
@@ -146,18 +158,29 @@ export default function ChannelSidebar() {
             )}
           </div>
         ) : (
-          <div className="h-12 px-4 flex items-center justify-between border-b border-black/20 text-white font-semibold text-sm shadow-sm">
+          <div className="h-12 px-3 sm:px-4 flex items-center justify-between border-b border-black/20 text-white font-semibold text-sm shadow-sm">
             <div className="flex items-center space-x-2">
               <MessageSquare className="w-4 h-4 text-discord-blurple" />
               <span>Mensajes Directos</span>
             </div>
-            <button
-              onClick={() => setStartDMOpen(true)}
-              className="p-1 hover:text-white text-discord-text-muted hover:bg-discord-hover rounded transition"
-              title="Iniciar nuevo mensaje directo"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={() => setStartDMOpen(true)}
+                className="p-1 hover:text-white text-discord-text-muted hover:bg-discord-hover rounded transition"
+                title="Iniciar nuevo mensaje directo"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              {onCloseMobile && (
+                <button
+                  onClick={onCloseMobile}
+                  className="md:hidden p-1 text-discord-text-muted hover:text-white rounded transition"
+                  title="Cerrar navegación"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -186,7 +209,10 @@ export default function ChannelSidebar() {
                   return (
                     <div
                       key={channel.id}
-                      onClick={() => selectChannel(channel)}
+                      onClick={() => {
+                        selectChannel(channel);
+                        onChannelSelect?.();
+                      }}
                       className={`w-full group flex items-center justify-between px-2 py-1.5 rounded text-sm transition cursor-pointer ${
                         isActive
                           ? 'bg-discord-active text-white font-medium'
@@ -258,7 +284,10 @@ export default function ChannelSidebar() {
                     return (
                       <div
                         key={conv.id}
-                        onClick={() => selectConversation(conv)}
+                        onClick={() => {
+                          selectConversation(conv);
+                          onChannelSelect?.();
+                        }}
                         className={`w-full group flex items-center justify-between px-2 py-2 rounded-lg text-sm transition cursor-pointer ${
                           isActive
                             ? 'bg-discord-active text-white font-medium'

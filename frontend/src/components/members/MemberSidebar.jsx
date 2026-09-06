@@ -1,16 +1,17 @@
 import React from 'react';
-import { Crown, Shield, MessageSquare } from 'lucide-react';
+import { Crown, Shield, MessageSquare, X, Users } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useAuthStore } from '../../store/authStore';
 import { useDMStore } from '../../store/dmStore';
 
-export default function MemberSidebar({ isVisible }) {
+export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }) {
   const members = useServerStore((state) => state.members);
   const setDMView = useServerStore((state) => state.setDMView);
   const currentUser = useAuthStore((state) => state.user);
   const startDirectMessage = useDMStore((state) => state.startDirectMessage);
 
-  if (!isVisible) return null;
+  // If not visible on desktop and not open on mobile, don't render
+  if (!isVisible && !isOpenMobile) return null;
 
   const onlineMembers = members.filter((m) => m.user.is_online);
   const offlineMembers = members.filter((m) => !m.user.is_online);
@@ -107,28 +108,60 @@ export default function MemberSidebar({ isVisible }) {
   };
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-discord-channels p-3 overflow-y-auto space-y-4 select-none border-l border-black/10">
-      {/* Online Section */}
-      <div>
-        <h3 className="text-[11px] font-bold text-discord-text-muted uppercase tracking-wider px-2 mb-1">
-          En línea — {onlineMembers.length}
-        </h3>
-        <div className="space-y-0.5">
-          {onlineMembers.map(renderMember)}
-        </div>
-      </div>
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {isOpenMobile && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
+          onClick={onCloseMobile}
+        />
+      )}
 
-      {/* Offline Section */}
-      {offlineMembers.length > 0 && (
+      {/* Member Sidebar: Slide-over drawer on mobile/tablet (< lg), fixed column on desktop (lg+) */}
+      <aside
+        className={`fixed lg:static inset-y-0 right-0 z-50 lg:z-auto w-64 lg:w-60 flex-shrink-0 bg-discord-channels p-3 overflow-y-auto space-y-4 select-none border-l border-black/10 shadow-2xl lg:shadow-none transition-transform duration-300 ease-in-out ${
+          isOpenMobile ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
+        } ${!isVisible ? 'lg:hidden' : 'lg:block'}`}
+      >
+        {/* Mobile Header with Close Button */}
+        <div className="flex items-center justify-between pb-2 border-b border-white/10 lg:hidden">
+          <div className="flex items-center space-x-2 text-white text-xs font-bold uppercase tracking-wider">
+            <Users className="w-4 h-4 text-discord-blurple" />
+            <span>Miembros del servidor</span>
+          </div>
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              className="p-1 rounded text-discord-text-muted hover:text-white hover:bg-discord-hover transition"
+              title="Cerrar lista de miembros"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Online Section */}
         <div>
           <h3 className="text-[11px] font-bold text-discord-text-muted uppercase tracking-wider px-2 mb-1">
-            Desconectado — {offlineMembers.length}
+            En línea — {onlineMembers.length}
           </h3>
           <div className="space-y-0.5">
-            {offlineMembers.map(renderMember)}
+            {onlineMembers.map(renderMember)}
           </div>
         </div>
-      )}
-    </aside>
+
+        {/* Offline Section */}
+        {offlineMembers.length > 0 && (
+          <div>
+            <h3 className="text-[11px] font-bold text-discord-text-muted uppercase tracking-wider px-2 mb-1">
+              Desconectado — {offlineMembers.length}
+            </h3>
+            <div className="space-y-0.5">
+              {offlineMembers.map(renderMember)}
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }

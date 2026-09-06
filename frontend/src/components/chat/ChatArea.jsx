@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Users, Send, Smile, Wifi, WifiOff } from 'lucide-react';
+import { Hash, Users, Send, Smile, Wifi, WifiOff, Menu } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { useChatWebSocket } from '../../hooks/useChatWebSocket';
 import SessionBanner from '../sessions/SessionBanner';
 
-export default function ChatArea({ onToggleMembers, showMembers }) {
+export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav }) {
   const activeChannel = useServerStore((state) => state.activeChannel);
   const activeServer = useServerStore((state) => state.activeServer);
   const token = useAuthStore((state) => state.token);
@@ -90,7 +90,16 @@ export default function ChatArea({ onToggleMembers, showMembers }) {
 
   if (!activeChannel) {
     return (
-      <main className="flex-1 bg-discord-chat flex flex-col items-center justify-center text-discord-text-muted select-none">
+      <main className="flex-1 bg-discord-chat flex flex-col items-center justify-center text-discord-text-muted select-none p-4 text-center">
+        {onOpenMobileNav && (
+          <button
+            onClick={onOpenMobileNav}
+            className="md:hidden mb-4 px-4 py-2 bg-discord-blurple text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow"
+          >
+            <Menu className="w-4 h-4" />
+            <span>Abrir Canales</span>
+          </button>
+        )}
         <Hash className="w-16 h-16 mb-4 opacity-40 text-discord-text-muted" />
         <h3 className="text-lg font-semibold text-white">Ningún canal seleccionado</h3>
         <p className="text-sm">Selecciona un canal en la barra lateral para ver los mensajes.</p>
@@ -101,15 +110,26 @@ export default function ChatArea({ onToggleMembers, showMembers }) {
   return (
     <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-text">
       {/* Channel Header Bar */}
-      <header className="h-12 border-b border-black/20 px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
+      <header className="h-12 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
         <div className="flex items-center space-x-2 min-w-0">
-          <Hash className="w-6 h-6 text-discord-text-muted flex-shrink-0" />
-          <span className="font-bold text-white text-sm truncate">
+          {/* Mobile Hamburger Menu Button */}
+          {onOpenMobileNav && (
+            <button
+              onClick={onOpenMobileNav}
+              className="md:hidden p-1.5 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-lg transition"
+              title="Abrir canales y servidores"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+
+          <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-discord-text-muted flex-shrink-0" />
+          <span className="font-bold text-white text-sm truncate max-w-[130px] sm:max-w-xs md:max-w-md">
             {activeChannel.name}
           </span>
           {activeChannel.topic && (
             <>
-              <div className="w-[1px] h-4 bg-white/10 mx-2" />
+              <div className="w-[1px] h-4 bg-white/10 mx-2 hidden sm:block" />
               <span className="text-xs text-discord-text-muted truncate hidden sm:inline">
                 {activeChannel.topic}
               </span>
@@ -118,7 +138,7 @@ export default function ChatArea({ onToggleMembers, showMembers }) {
         </div>
 
         {/* Right side controls */}
-        <div className="flex items-center space-x-3 text-discord-text-muted">
+        <div className="flex items-center space-x-2 sm:space-x-3 text-discord-text-muted">
           {/* WebSocket Connection indicator */}
           <div
             className="flex items-center space-x-1 text-xs"
@@ -133,7 +153,7 @@ export default function ChatArea({ onToggleMembers, showMembers }) {
 
           <button
             onClick={onToggleMembers}
-            className={`p-1 hover:text-white transition rounded ${
+            className={`p-1.5 hover:text-white transition rounded ${
               showMembers ? 'text-white' : 'text-discord-text-muted'
             }`}
             title="Lista de miembros"
@@ -231,10 +251,10 @@ export default function ChatArea({ onToggleMembers, showMembers }) {
       </div>
 
       {/* Message Input Box */}
-      <div className="px-4 pb-4 flex-shrink-0 select-none">
+      <div className="px-2 sm:px-4 pb-2 sm:pb-4 flex-shrink-0 select-none">
         <form
           onSubmit={handleSendMessage}
-          className="bg-discord-input rounded-lg px-4 py-2.5 flex items-center space-x-3 shadow-inner"
+          className="bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner"
         >
           <input
             type="text"
