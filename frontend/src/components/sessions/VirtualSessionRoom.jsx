@@ -32,6 +32,7 @@ import { useSessionStore } from '../../store/sessionStore';
 import ScreenShareModal from './ScreenShareModal';
 import ConfirmModal from '../modals/ConfirmModal';
 import api from '../../api/client';
+import { playJoinSound, playLeaveSound, playMuteSound, playUnmuteSound } from '../../utils/soundEffects';
 
 const ICE_SERVERS = {
   iceServers: [
@@ -54,6 +55,75 @@ function RemoteParticipantCard({
   const audioRef = useRef(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Active Speaker Detector for Remote Participant using Web Audio API
+  useEffect(() => {
+    if (!stream || participant.is_audio_muted) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
+    if (audioTracks.length === 0 || !audioTracks[0].enabled) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    let audioCtx = null;
+    let analyser = null;
+    let source = null;
+    let animFrame = null;
+    let activeHold = 0;
+
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.4;
+        source = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const checkVolume = () => {
+          if (!analyser) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+
+          if (avg > 18) {
+            activeHold = 6;
+            setIsSpeaking(true);
+          } else {
+            if (activeHold > 0) {
+              activeHold--;
+            } else {
+              setIsSpeaking(false);
+            }
+          }
+          animFrame = requestAnimationFrame(checkVolume);
+        };
+
+        checkVolume();
+      }
+    } catch (_) {}
+
+    return () => {
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (source) {
+        try { source.disconnect(); } catch (_) {}
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+      }
+    };
+  }, [stream, participant.is_audio_muted]);
 
   useEffect(() => {
     if (!stream) {
@@ -125,7 +195,11 @@ function RemoteParticipantCard({
   const showVideo = !participant.is_video_off && (hasVideo || isPlaying);
 
   return (
-    <div className="relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 h-full w-full min-h-[140px] group">
+    <div className={`relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border transition-all duration-200 h-full w-full min-h-[140px] group ${
+      isSpeaking
+        ? 'ring-2 ring-discord-green shadow-lg shadow-discord-green/30 border-discord-green/60'
+        : 'border-white/5'
+    }`}>
       {/* Dedicated Remote Audio Playback Element: never interrupted by video toggles */}
       <audio ref={audioRef} autoPlay playsInline />
 
@@ -202,12 +276,14 @@ function RemoteParticipantCard({
         </div>
       )}
 
-      <div className="absolute bottom-3 left-3 z-20 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2">
-        <span>{participant.username}</span>
+      <div className={`absolute bottom-3 left-3 z-20 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2 border transition-colors duration-200 ${
+        isSpeaking ? 'border-discord-green/50 text-discord-green' : 'border-transparent text-white'
+      }`}>
+        <span className="truncate max-w-[120px]">{participant.username}</span>
         {participant.is_audio_muted ? (
           <MicOff className="w-3.5 h-3.5 text-discord-red" />
         ) : (
-          <Mic className="w-3.5 h-3.5 text-discord-green" />
+          <Mic className={`w-3.5 h-3.5 ${isSpeaking ? 'text-discord-green animate-pulse' : 'text-discord-text-muted'}`} />
         )}
       </div>
     </div>
@@ -457,6 +533,147 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Active Speaker Detector for Local User
+  const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
+
+  // Network Quality & Ping stats ({ rtt: number | null, quality: 'excellent' | 'good' | 'poor' })
+  const [networkQuality, setNetworkQuality] = useState({ rtt: null, quality: 'good' });
+
+  // Mobile Screen WakeLock API (keeps phone screen on during call)
+  useEffect(() => {
+    let wakeLock = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (_) {}
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Monitor Local Audio Volume for Active Speaker Green Halo
+  useEffect(() => {
+    if (!stream || isAudioMuted) {
+      setIsLocalSpeaking(false);
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
+    if (audioTracks.length === 0 || !audioTracks[0].enabled) {
+      setIsLocalSpeaking(false);
+      return;
+    }
+
+    let audioCtx = null;
+    let analyser = null;
+    let source = null;
+    let animFrame = null;
+    let activeHold = 0;
+
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.4;
+        source = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+        source.connect(analyser);
+
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const checkVolume = () => {
+          if (!analyser) return;
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+          }
+          const avg = sum / dataArray.length;
+
+          if (avg > 18) {
+            activeHold = 6;
+            setIsLocalSpeaking(true);
+          } else {
+            if (activeHold > 0) {
+              activeHold--;
+            } else {
+              setIsLocalSpeaking(false);
+            }
+          }
+          animFrame = requestAnimationFrame(checkVolume);
+        };
+
+        checkVolume();
+      }
+    } catch (_) {}
+
+    return () => {
+      if (animFrame) cancelAnimationFrame(animFrame);
+      if (source) {
+        try { source.disconnect(); } catch (_) {}
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+      }
+    };
+  }, [stream, isAudioMuted]);
+
+  // Periodic WebRTC Network Quality & Ping Monitor via getStats
+  useEffect(() => {
+    const statsInterval = setInterval(async () => {
+      const pcs = Object.values(peerConnectionsRef.current || {});
+      if (pcs.length === 0) {
+        setNetworkQuality({ rtt: null, quality: 'good' });
+        return;
+      }
+
+      let minRtt = null;
+      for (const pc of pcs) {
+        try {
+          const stats = await pc.getStats();
+          stats.forEach((report) => {
+            if (
+              report.type === 'candidate-pair' &&
+              report.state === 'succeeded' &&
+              report.currentRoundTripTime !== undefined
+            ) {
+              const rttMs = Math.round(report.currentRoundTripTime * 1000);
+              if (minRtt === null || rttMs < minRtt) {
+                minRtt = rttMs;
+              }
+            }
+          });
+        } catch (_) {}
+      }
+
+      if (minRtt !== null) {
+        let quality = 'excellent';
+        if (minRtt > 220) quality = 'poor';
+        else if (minRtt > 90) quality = 'good';
+        setNetworkQuality({ rtt: minRtt, quality });
+      }
+    }, 3500);
+
+    return () => clearInterval(statsInterval);
+  }, []);
 
   const sidebarOpenRef = useRef(sidebarOpen);
   const sidebarTabRef = useRef(sidebarTab);
@@ -1260,6 +1477,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             }
           } else if (data.event_type === 'user_joined') {
             if (String(data.user_id) !== String(user?.id)) {
+              playJoinSound();
               setParticipants((prev) => {
                 if (prev.some((p) => String(p.user_id) === String(data.user_id))) return prev;
                 return [
@@ -1288,6 +1506,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           } else if (data.event_type === 'participant_approved') {
             setPendingRequests((prev) => prev.filter((p) => String(p.user_id) !== String(data.user_id)));
             if (String(data.user_id) !== String(user?.id)) {
+              playJoinSound();
               setParticipants((prev) => {
                 if (prev.some((p) => String(p.user_id) === String(data.user_id))) return prev;
                 return [
@@ -1315,6 +1534,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
               )
             );
           } else if (data.event_type === 'user_left') {
+            playLeaveSound();
             closePeerConnection(data.user_id);
             setParticipants((prev) => prev.filter((p) => String(p.user_id) !== String(data.user_id)));
             setPendingRequests((prev) => prev.filter((p) => String(p.user_id) !== String(data.user_id)));
@@ -1341,6 +1561,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
             }
           } else if (data.event_type === 'host_forced_mute') {
             if (String(data.target_user_id) === String(user?.id)) {
+              playMuteSound();
               if (localStreamRef.current) {
                 localStreamRef.current.getAudioTracks().forEach((t) => {
                   t.enabled = false;
@@ -1409,6 +1630,12 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   const toggleAudio = () => {
     const nextMuted = !isAudioMuted;
     setIsAudioMuted(nextMuted);
+
+    if (nextMuted) {
+      playMuteSound();
+    } else {
+      playUnmuteSound();
+    }
 
     if (stream) {
       stream.getAudioTracks().forEach((track) => {
@@ -1856,7 +2083,44 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         </div>
 
         {/* Right Header Actions */}
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-2 sm:space-x-2.5">
+          {/* Live Ping & Connection Quality Indicator */}
+          <div
+            className="flex items-center space-x-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-black/40 border border-white/5 text-xs text-discord-text-muted select-none"
+            title={networkQuality.rtt !== null ? `Latencia WebRTC: ${networkQuality.rtt}ms (${networkQuality.quality})` : 'Conexión WebRTC directa activa'}
+          >
+            <div className="flex items-end space-x-0.5 h-3.5 pb-0.5">
+              <span
+                className={`w-1 rounded-full transition-colors ${
+                  networkQuality.quality === 'poor'
+                    ? 'bg-discord-red h-1.5'
+                    : networkQuality.quality === 'good'
+                    ? 'bg-discord-yellow h-1.5'
+                    : 'bg-discord-green h-1.5'
+                }`}
+              />
+              <span
+                className={`w-1 rounded-full transition-colors ${
+                  networkQuality.quality === 'poor'
+                    ? 'bg-white/20 h-2.5'
+                    : networkQuality.quality === 'good'
+                    ? 'bg-discord-yellow h-2.5'
+                    : 'bg-discord-green h-2.5'
+                }`}
+              />
+              <span
+                className={`w-1 rounded-full transition-colors ${
+                  networkQuality.quality === 'excellent'
+                    ? 'bg-discord-green h-3.5'
+                    : 'bg-white/20 h-3.5'
+                }`}
+              />
+            </div>
+            <span className="font-mono text-[11px]">
+              {networkQuality.rtt !== null ? `${networkQuality.rtt}ms` : 'En vivo'}
+            </span>
+          </div>
+
           {/* VPN Security Indicator Badge */}
           <div className="hidden md:flex items-center space-x-1.5 bg-discord-green/10 text-discord-green border border-discord-green/20 text-xs px-3 py-1 rounded-full font-medium">
             <ShieldCheck className="w-4 h-4" />
@@ -2026,10 +2290,14 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           >
             {/* Local User Video Card */}
             <div
-              className={`relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border border-white/5 ${
+              className={`relative bg-discord-chat rounded-xl overflow-hidden shadow-2xl flex items-center justify-center border transition-all duration-200 ${
                 activeScreenShare || isScreenSharing || remoteScreenStream
                   ? 'w-44 sm:w-56 h-32 sm:h-36 flex-shrink-0'
                   : 'h-44 sm:h-64 lg:h-80 w-full'
+              } ${
+                isLocalSpeaking
+                  ? 'ring-2 ring-discord-green shadow-lg shadow-discord-green/30 border-discord-green/60'
+                  : 'border-white/5'
               }`}
             >
               <video
@@ -2049,12 +2317,14 @@ export default function VirtualSessionRoom({ session, onLeave }) {
                 </div>
               )}
 
-              <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2">
+              <div className={`absolute bottom-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-md text-xs font-semibold flex items-center space-x-2 border transition-colors duration-200 ${
+                isLocalSpeaking ? 'border-discord-green/50 text-discord-green' : 'border-transparent text-white'
+              }`}>
                 <span>{user?.username} (Tú)</span>
                 {isAudioMuted ? (
                   <MicOff className="w-3.5 h-3.5 text-discord-red" />
                 ) : (
-                  <Mic className="w-3.5 h-3.5 text-discord-green" />
+                  <Mic className={`w-3.5 h-3.5 ${isLocalSpeaking ? 'text-discord-green animate-pulse' : 'text-discord-text-muted'}`} />
                 )}
               </div>
             </div>

@@ -28,6 +28,14 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
+  updateMessageReactions: (messageId, reactions) => {
+    set(state => ({
+      messages: state.messages.map(m =>
+        m.id === messageId ? { ...m, reactions } : m
+      ),
+    }));
+  },
+
   setTypingUser: (userId, username, isTyping) => {
     set(state => {
       const updated = { ...state.typingUsers };

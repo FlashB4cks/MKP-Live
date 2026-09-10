@@ -89,6 +89,14 @@ export const useDMStore = create((set, get) => ({
     });
   },
 
+  updateMessageReactions: (messageId, reactions) => {
+    set(state => ({
+      messages: state.messages.map(m =>
+        m.id === messageId ? { ...m, reactions } : m
+      ),
+    }));
+  },
+
   sendDirectMessage: async (content) => {
     const activeConv = get().activeConversation;
     if (!activeConv?.id || !content.trim()) return;

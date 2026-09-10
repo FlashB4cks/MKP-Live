@@ -5,6 +5,7 @@ export function useDMWebSocket(conversationId, token) {
   const wsRef = useRef(null);
   const [isConnected, setIsConnected] = useState(false);
   const addMessage = useDMStore((state) => state.addMessage);
+  const updateMessageReactions = useDMStore((state) => state.updateMessageReactions);
   const setTypingUser = useDMStore((state) => state.setTypingUser);
   const reconnectTimeoutRef = useRef(null);
 
@@ -39,6 +40,8 @@ export function useDMWebSocket(conversationId, token) {
           const data = JSON.parse(event.data);
           if (data.type === 'chat_message') {
             addMessage(data.message);
+          } else if (data.type === 'message_reaction') {
+            updateMessageReactions(data.message_id, data.reactions);
           } else if (data.type === 'typing') {
             setTypingUser(data.username, data.is_typing);
           }

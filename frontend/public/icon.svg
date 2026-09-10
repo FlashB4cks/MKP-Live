@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5865F2" />
+      <stop offset="100%" stop-color="#3b42a0" />
+    </linearGradient>
+    <linearGradient id="liveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#57F287" />
+      <stop offset="100%" stop-color="#3ba55d" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#bgGrad)" />
+  <!-- Video Camera / Live Icon -->
+  <path d="M140 180 C140 160, 155 145, 175 145 L300 145 C320 145, 335 160, 335 180 L335 332 C335 352, 320 367, 300 367 L175 367 C155 367, 140 352, 140 332 Z" fill="#FFFFFF" opacity="0.95" />
+  <path d="M335 220 L400 175 C410 168, 420 174, 420 186 L420 326 C420 338, 410 344, 400 337 L335 292 Z" fill="#FFFFFF" opacity="0.95" />
+  <!-- Live Glowing Badge -->
+  <circle cx="395" cy="115" r="28" fill="url(#liveGrad)" />
+  <circle cx="395" cy="115" r="40" fill="url(#liveGrad)" opacity="0.4" />
+</svg>

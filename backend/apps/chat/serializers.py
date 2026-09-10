@@ -9,6 +9,7 @@ class MessageSerializer(serializers.ModelSerializer):
         model = Message
         fields = [
             'id', 'channel', 'author', 'content',
+            'attachment', 'attachment_type', 'attachment_name', 'reactions',
             'is_edited', 'reply_to', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'author', 'is_edited', 'created_at', 'updated_at']
@@ -20,6 +21,7 @@ class DirectMessageSerializer(serializers.ModelSerializer):
         model = DirectMessage
         fields = [
             'id', 'conversation', 'sender', 'content',
+            'attachment', 'attachment_type', 'attachment_name', 'reactions',
             'is_read', 'created_at'
         ]
         read_only_fields = ['id', 'sender', 'is_read', 'created_at']

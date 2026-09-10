@@ -127,6 +127,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'message': event['message'],
         }))
 
+    async def reaction_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_reaction',
+            'message_id': event['message_id'],
+            'reactions': event['reactions'],
+        }))
+
     async def typing_broadcast(self, event):
         # Don't send typing to self
         if event.get('user_id') != str(self.user.id):
@@ -173,6 +180,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'channel': str(channel.id),
             'author': UserSerializer(user).data,
             'content': msg.content,
+            'attachment': None,
+            'attachment_type': '',
+            'attachment_name': '',
+            'reactions': {},
             'is_edited': msg.is_edited,
             'created_at': msg.created_at.isoformat(),
         }
@@ -252,6 +263,13 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({
             'type': 'chat_message',
             'message': event['message'],
+        }))
+
+    async def reaction_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_reaction',
+            'message_id': event['message_id'],
+            'reactions': event['reactions'],
         }))
 
     async def typing_broadcast(self, event):

@@ -1,21 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Hash, Users, Send, Smile, Wifi, WifiOff, Menu } from 'lucide-react';
+import {
+  Hash,
+  Users,
+  Send,
+  Wifi,
+  WifiOff,
+  Menu,
+  Paperclip,
+  Search,
+  X,
+  Loader2,
+} from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useChatStore } from '../../store/chatStore';
 import { useAuthStore } from '../../store/authStore';
 import { useChatWebSocket } from '../../hooks/useChatWebSocket';
 import SessionBanner from '../sessions/SessionBanner';
+import VoiceRecorder from './VoiceRecorder';
+import MessageAttachment from './MessageAttachment';
+import MessageReactions, { ReactionBar } from './MessageReactions';
+import api from '../../api/client';
 
 export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav }) {
   const activeChannel = useServerStore((state) => state.activeChannel);
   const activeServer = useServerStore((state) => state.activeServer);
   const token = useAuthStore((state) => state.token);
+  const currentUser = useAuthStore((state) => state.user);
   const messages = useChatStore((state) => state.messages);
   const loading = useChatStore((state) => state.loading);
   const fetchMessages = useChatStore((state) => state.fetchMessages);
   const typingUsers = useChatStore((state) => state.typingUsers);
+  const updateMessageReactions = useChatStore((state) => state.updateMessageReactions);
 
   const [inputText, setInputText] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -29,13 +51,17 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
   useEffect(() => {
     if (activeChannel?.id) {
       fetchMessages(activeChannel.id);
+      setSearchQuery('');
+      setIsSearchOpen(false);
     }
   }, [activeChannel?.id, fetchMessages]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!searchQuery) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, searchQuery]);
 
   const handleInputChange = (e) => {
     setInputText(e.target.value);
@@ -69,6 +95,68 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
     }
   };
 
+  // Toggle emoji reaction
+  const handleToggleReaction = async (messageId, emoji) => {
+    try {
+      const res = await api.post(`/chat/messages/${messageId}/reaction/`, {
+        emoji,
+        is_dm: false,
+      });
+      if (res.data?.reactions) {
+        updateMessageReactions(messageId, res.data.reactions);
+      }
+    } catch (err) {
+      console.error('Error al reaccionar', err);
+    }
+  };
+
+  // File and image upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChannel?.id) return;
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('channel_id', activeChannel.id);
+      if (inputText.trim()) {
+        formData.append('content', inputText.trim());
+        setInputText('');
+      }
+
+      await api.post('/chat/upload/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    } catch (err) {
+      console.error('Error al subir archivo', err);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // Voice note upload
+  const handleSendVoiceNote = async (audioBlob, mimeType) => {
+    if (!audioBlob || !activeChannel?.id) return;
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+      formData.append('file', audioBlob, `audio_nota_${Date.now()}.${ext}`);
+      formData.append('channel_id', activeChannel.id);
+
+      await api.post('/chat/upload/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+    } catch (err) {
+      console.error('Error al enviar nota de voz', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Format typing text
   const typingNames = Object.values(typingUsers);
   let typingMessage = '';
@@ -87,6 +175,15 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
       return '';
     }
   };
+
+  // Filter messages by search term
+  const filteredMessages = searchQuery.trim()
+    ? messages.filter((m) =>
+        (m.content && m.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (m.attachment_name && m.attachment_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (m.author?.username && m.author.username.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : messages;
 
   if (!activeChannel) {
     return (
@@ -111,7 +208,7 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
     <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-text">
       {/* Channel Header Bar */}
       <header className="h-12 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
-        <div className="flex items-center space-x-2 min-w-0">
+        <div className="flex items-center space-x-2 min-w-0 flex-1">
           {/* Mobile Hamburger Menu Button */}
           {onOpenMobileNav && (
             <button
@@ -138,7 +235,43 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
         </div>
 
         {/* Right side controls */}
-        <div className="flex items-center space-x-2 sm:space-x-3 text-discord-text-muted">
+        <div className="flex items-center space-x-2 sm:space-x-3 text-discord-text-muted flex-shrink-0">
+          {/* Channel Message Search Bar */}
+          <div className="relative flex items-center">
+            {isSearchOpen ? (
+              <div className="flex items-center bg-discord-input rounded-md px-2 py-1 space-x-1 border border-white/10 animate-in fade-in">
+                <Search className="w-3.5 h-3.5 text-discord-text-muted" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar en el canal..."
+                  autoFocus
+                  className="bg-transparent text-xs text-white placeholder:text-discord-text-muted focus:outline-none w-28 sm:w-44"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setIsSearchOpen(false);
+                  }}
+                  className="text-discord-text-muted hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(true)}
+                className="p-1.5 hover:text-white transition rounded hover:bg-white/5"
+                title="Buscar mensajes en este canal"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
           {/* WebSocket Connection indicator */}
           <div
             className="flex items-center space-x-1 text-xs"
@@ -166,28 +299,49 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
       {/* Virtual Sessions Banner (Active & Scheduled with VPN protection) */}
       <SessionBanner serverId={activeServer?.id} />
 
+      {/* Search results notification banner */}
+      {searchQuery.trim() && (
+        <div className="px-4 py-1.5 bg-discord-sidebar/90 border-b border-white/10 text-xs text-discord-text-muted flex justify-between items-center select-none">
+          <span>
+            Mostrando resultados para &ldquo;<strong className="text-white">{searchQuery}</strong>&rdquo; ({filteredMessages.length} mensaje{filteredMessages.length !== 1 ? 's' : ''})
+          </span>
+          <button
+            onClick={() => setSearchQuery('')}
+            className="text-discord-blurple hover:underline font-semibold"
+          >
+            Limpiar búsqueda
+          </button>
+        </div>
+      )}
+
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Channel Welcome Banner */}
-        <div className="mb-6 pt-4">
-          <div className="w-16 h-16 rounded-full bg-discord-sidebar flex items-center justify-center mb-3">
-            <Hash className="w-10 h-10 text-white" />
+        {!searchQuery && (
+          <div className="mb-6 pt-4">
+            <div className="w-16 h-16 rounded-full bg-discord-sidebar flex items-center justify-center mb-3">
+              <Hash className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">
+              ¡Te damos la bienvenida a #{activeChannel.name}!
+            </h2>
+            <p className="text-sm text-discord-text-muted mt-1">
+              Este es el comienzo del canal #{activeChannel.name}.
+            </p>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-white">
-            ¡Te damos la bienvenida a #{activeChannel.name}!
-          </h2>
-          <p className="text-sm text-discord-text-muted mt-1">
-            Este es el comienzo del canal #{activeChannel.name}.
-          </p>
-        </div>
+        )}
 
         {loading ? (
           <div className="text-center py-6 text-sm text-discord-text-muted">
             Cargando mensajes...
           </div>
+        ) : filteredMessages.length === 0 ? (
+          <div className="text-center py-8 text-sm text-discord-text-muted">
+            {searchQuery ? 'No se encontraron mensajes que coincidan.' : 'No hay mensajes aún.'}
+          </div>
         ) : (
-          messages.map((msg, idx) => {
-            const prevMsg = idx > 0 ? messages[idx - 1] : null;
+          filteredMessages.map((msg, idx) => {
+            const prevMsg = idx > 0 ? filteredMessages[idx - 1] : null;
             const isSameAuthorSameMinute =
               prevMsg &&
               prevMsg.author?.id === msg.author?.id &&
@@ -196,10 +350,15 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
             return (
               <div
                 key={msg.id || idx}
-                className={`group flex items-start space-x-4 hover:bg-discord-hover/40 -mx-4 px-4 py-1 rounded transition duration-75 ${
+                className={`relative group flex items-start space-x-4 hover:bg-discord-hover/40 -mx-4 px-4 py-1.5 rounded transition duration-75 ${
                   isSameAuthorSameMinute ? 'mt-0.5' : 'mt-3'
                 }`}
               >
+                {/* Floating Emoji Quick Reaction Bar on Hover */}
+                <div className="absolute right-4 -top-3 z-10 hidden group-hover:flex items-center">
+                  <ReactionBar onSelectEmoji={(emoji) => handleToggleReaction(msg.id, emoji)} />
+                </div>
+
                 {!isSameAuthorSameMinute ? (
                   <div className="w-10 h-10 rounded-full bg-discord-blurple flex-shrink-0 flex items-center justify-center font-bold text-white text-sm overflow-hidden select-none">
                     {msg.author?.avatar_url ? (
@@ -231,9 +390,28 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
                       </span>
                     </div>
                   )}
-                  <p className="text-discord-text text-sm whitespace-pre-wrap break-words leading-relaxed">
-                    {msg.content}
-                  </p>
+
+                  {msg.content && (
+                    <p className="text-discord-text text-sm whitespace-pre-wrap break-words leading-relaxed">
+                      {msg.content}
+                    </p>
+                  )}
+
+                  {/* Attachment rendering (images, voice notes, files) */}
+                  {msg.attachment && (
+                    <MessageAttachment
+                      attachment={msg.attachment}
+                      attachmentType={msg.attachment_type}
+                      attachmentName={msg.attachment_name}
+                    />
+                  )}
+
+                  {/* Interactive Emoji Reaction Badges */}
+                  <MessageReactions
+                    reactions={msg.reactions}
+                    currentUserId={currentUser?.id}
+                    onToggleReaction={(emoji) => handleToggleReaction(msg.id, emoji)}
+                  />
                 </div>
               </div>
             );
@@ -252,10 +430,33 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
 
       {/* Message Input Box */}
       <div className="px-2 sm:px-4 pb-16 md:pb-4 flex-shrink-0 select-none">
+        {/* Hidden File Input */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
         <form
           onSubmit={handleSendMessage}
           className="bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner"
         >
+          {/* File Attachment Upload Button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="text-discord-text-muted hover:text-white transition p-1 rounded-md hover:bg-white/5 disabled:opacity-40"
+            title="Adjuntar archivo o imagen"
+          >
+            {isUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-discord-blurple" />
+            ) : (
+              <Paperclip className="w-5 h-5" />
+            )}
+          </button>
+
           <input
             type="text"
             value={inputText}
@@ -264,10 +465,18 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
             placeholder={`Enviar mensaje a #${activeChannel.name}`}
             className="flex-1 bg-transparent text-sm text-white placeholder:text-discord-text-muted focus:outline-none"
           />
+
+          {/* Voice Recorder button & controls */}
+          <VoiceRecorder
+            onSendAudio={handleSendVoiceNote}
+            disabled={!isConnected || isUploading}
+          />
+
           <button
             type="submit"
             disabled={!inputText.trim() || !isConnected}
-            className="text-discord-text-muted hover:text-white transition disabled:opacity-30"
+            className="text-discord-text-muted hover:text-white transition disabled:opacity-30 p-1"
+            title="Enviar mensaje"
           >
             <Send className="w-5 h-5" />
           </button>

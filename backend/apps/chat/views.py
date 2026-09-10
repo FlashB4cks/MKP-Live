@@ -36,6 +36,10 @@ class MessageListView(generics.ListAPIView):
             )
 
         queryset = Message.objects.filter(channel=channel).select_related('author')
+
+        search_query = self.request.query_params.get('search', '').strip()
+        if search_query:
+            queryset = queryset.filter(content__icontains=search_query)
         
         # Optional cursor / pagination parameter
         before_id = self.request.query_params.get('before')
@@ -155,4 +159,178 @@ class UserSearchView(APIView):
             )
         serializer = UserSerializer(users[:30], many=True, context={'request': request})
         return Response(serializer.data)
+
+
+from rest_framework.parsers import MultiPartParser, FormParser
+
+class ChatFileUploadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request):
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'detail': 'No se proporcionó ningún archivo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        channel_id = request.data.get('channel_id')
+        conversation_id = request.data.get('conversation_id')
+        content = request.data.get('content', '').strip()
+
+        # Determine file type
+        mime = getattr(file_obj, 'content_type', '') or ''
+        name = file_obj.name.lower()
+        if mime.startswith('image/') or name.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')):
+            attachment_type = 'image'
+        elif mime.startswith('audio/') or name.endswith(('.webm', '.ogg', '.mp3', '.wav', '.m4a', '.aac')):
+            attachment_type = 'audio'
+        else:
+            attachment_type = 'file'
+
+        channel_layer = get_channel_layer()
+
+        if channel_id:
+            channel = get_object_or_404(Channel, id=channel_id)
+            is_member = ServerMember.objects.filter(server=channel.server, user=request.user).exists()
+            if not is_member:
+                raise permissions.exceptions.PermissionDenied("No tienes permiso en este servidor.")
+
+            msg = Message.objects.create(
+                channel=channel,
+                author=request.user,
+                content=content,
+                attachment=file_obj,
+                attachment_name=file_obj.name,
+                attachment_type=attachment_type
+            )
+            data = MessageSerializer(msg, context={'request': request}).data
+
+            if channel_layer:
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"chat_{channel_id}",
+                        {
+                            'type': 'chat_message_broadcast',
+                            'message': data,
+                        }
+                    )
+                except Exception:
+                    pass
+
+            return Response(data, status=status.HTTP_201_CREATED)
+
+        elif conversation_id:
+            conv = get_object_or_404(DMConversation, id=conversation_id)
+            if not conv.participants.filter(id=request.user.id).exists():
+                raise permissions.exceptions.PermissionDenied("No perteneces a esta conversación.")
+
+            msg = DirectMessage.objects.create(
+                conversation=conv,
+                sender=request.user,
+                content=content,
+                attachment=file_obj,
+                attachment_name=file_obj.name,
+                attachment_type=attachment_type
+            )
+            conv.save(update_fields=['updated_at'])
+            data = DirectMessageSerializer(msg, context={'request': request}).data
+
+            if channel_layer:
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"dm_{conversation_id}",
+                        {
+                            'type': 'dm_message_broadcast',
+                            'message': data,
+                        }
+                    )
+                except Exception:
+                    pass
+
+            return Response(data, status=status.HTTP_201_CREATED)
+
+        return Response({'detail': 'Debes especificar channel_id o conversation_id.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MessageReactionToggleView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, message_id):
+        emoji = request.data.get('emoji', '').strip()
+        is_dm = request.data.get('is_dm', False)
+        if not emoji:
+            return Response({'detail': 'Emoji requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        channel_layer = get_channel_layer()
+        user_id = request.user.id
+
+        if is_dm:
+            msg = get_object_or_404(DirectMessage, id=message_id)
+            if not msg.conversation.participants.filter(id=request.user.id).exists():
+                raise permissions.exceptions.PermissionDenied("No tienes permiso en este mensaje.")
+
+            reactions = dict(msg.reactions or {})
+            users = reactions.get(emoji, [])
+            if user_id in users:
+                users.remove(user_id)
+                if not users:
+                    reactions.pop(emoji, None)
+                else:
+                    reactions[emoji] = users
+            else:
+                reactions.setdefault(emoji, []).append(user_id)
+
+            msg.reactions = reactions
+            msg.save(update_fields=['reactions'])
+
+            if channel_layer:
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"dm_{msg.conversation.id}",
+                        {
+                            'type': 'reaction_broadcast',
+                            'message_id': msg.id,
+                            'reactions': msg.reactions,
+                            'is_dm': True,
+                        }
+                    )
+                except Exception:
+                    pass
+
+            return Response({'status': 'ok', 'message_id': msg.id, 'reactions': msg.reactions})
+
+        else:
+            msg = get_object_or_404(Message, id=message_id)
+            is_member = ServerMember.objects.filter(server=msg.channel.server, user=request.user).exists()
+            if not is_member:
+                raise permissions.exceptions.PermissionDenied("No tienes permiso en este mensaje.")
+
+            reactions = dict(msg.reactions or {})
+            users = reactions.get(emoji, [])
+            if user_id in users:
+                users.remove(user_id)
+                if not users:
+                    reactions.pop(emoji, None)
+                else:
+                    reactions[emoji] = users
+            else:
+                reactions.setdefault(emoji, []).append(user_id)
+
+            msg.reactions = reactions
+            msg.save(update_fields=['reactions'])
+
+            if channel_layer:
+                try:
+                    async_to_sync(channel_layer.group_send)(
+                        f"chat_{msg.channel.id}",
+                        {
+                            'type': 'reaction_broadcast',
+                            'message_id': msg.id,
+                            'reactions': msg.reactions,
+                            'is_dm': False,
+                        }
+                    )
+                except Exception:
+                    pass
+
+            return Response({'status': 'ok', 'message_id': msg.id, 'reactions': msg.reactions})
 

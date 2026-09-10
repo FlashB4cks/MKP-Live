@@ -1,0 +1,19 @@
+{
+  "name": "MKP Live",
+  "short_name": "MKP Live",
+  "description": "Plataforma de Videoconferencias, Mensajería y Colaboración Segura",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#202225",
+  "theme_color": "#2f3136",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

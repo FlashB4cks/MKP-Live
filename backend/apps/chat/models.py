@@ -16,7 +16,11 @@ class Message(models.Model):
         blank=True,
         related_name='messages'
     )
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
+    attachment = models.FileField(upload_to='chat_attachments/%Y/%m/', null=True, blank=True)
+    attachment_type = models.CharField(max_length=20, blank=True, default='') # 'image', 'audio', 'file'
+    attachment_name = models.CharField(max_length=255, blank=True, default='')
+    reactions = models.JSONField(default=dict, blank=True)
     is_edited = models.BooleanField(default=False)
     reply_to = models.ForeignKey(
         'self',
@@ -66,7 +70,11 @@ class DirectMessage(models.Model):
         on_delete=models.CASCADE,
         related_name='sent_direct_messages'
     )
-    content = models.TextField()
+    content = models.TextField(blank=True, default='')
+    attachment = models.FileField(upload_to='chat_attachments/%Y/%m/', null=True, blank=True)
+    attachment_type = models.CharField(max_length=20, blank=True, default='') # 'image', 'audio', 'file'
+    attachment_name = models.CharField(max_length=255, blank=True, default='')
+    reactions = models.JSONField(default=dict, blank=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
