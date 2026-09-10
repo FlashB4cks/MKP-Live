@@ -41,7 +41,43 @@ const ICE_SERVERS = {
     { urls: 'stun:stun.cloudflare.com:3478' },
   ],
   iceCandidatePoolSize: 10,
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require',
 };
+
+// Global shared singleton AudioContext to prevent exceeding mobile hardware limits (max 6 contexts)
+let sharedAudioContext = null;
+function getSharedAudioContext() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+
+    if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+      sharedAudioContext = new AudioContextClass();
+    }
+    if (sharedAudioContext.state === 'suspended') {
+      sharedAudioContext.resume().catch(() => {});
+    }
+    return sharedAudioContext;
+  } catch (e) {
+    console.warn('[WebAudio] Error getting shared AudioContext:', e);
+    return null;
+  }
+}
+
+// Opus FEC and DTX tuning for robust audio packet loss recovery and bandwidth savings
+function tuneSdp(sdp) {
+  if (!sdp) return sdp;
+  return sdp.replace(/a=fmtp:(\d+) (.*)/g, (match, pt, rest) => {
+    if (rest.includes('minptime') || rest.includes('useinbandfec') || rest.includes('stereo') || rest.includes('opus')) {
+      let updated = rest;
+      if (!updated.includes('useinbandfec=1')) updated += ';useinbandfec=1';
+      if (!updated.includes('usedtx=1')) updated += ';usedtx=1';
+      return `a=fmtp:${pt} ${updated}`;
+    }
+    return match;
+  });
+}
 
 function RemoteParticipantCard({
   participant,
@@ -57,7 +93,7 @@ function RemoteParticipantCard({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  // Active Speaker Detector for Remote Participant using Web Audio API
+  // Active Speaker Detector for Remote Participant using shared Web Audio API
   useEffect(() => {
     if (!stream || participant.is_audio_muted) {
       setIsSpeaking(false);
@@ -70,16 +106,14 @@ function RemoteParticipantCard({
       return;
     }
 
-    let audioCtx = null;
     let analyser = null;
     let source = null;
     let animFrame = null;
     let activeHold = 0;
 
     try {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
+      const audioCtx = getSharedAudioContext();
+      if (audioCtx) {
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.4;
@@ -119,8 +153,8 @@ function RemoteParticipantCard({
       if (source) {
         try { source.disconnect(); } catch (_) {}
       }
-      if (audioCtx) {
-        audioCtx.close().catch(() => {});
+      if (analyser) {
+        try { analyser.disconnect(); } catch (_) {}
       }
     };
   }, [stream, participant.is_audio_muted]);
@@ -137,17 +171,19 @@ function RemoteParticipantCard({
       const liveVideo = vTracks.length > 0 && vTracks.some((t) => t.enabled && t.readyState === 'live');
       setHasVideo(liveVideo);
 
-      if (videoRef.current && videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-      }
       if (videoRef.current) {
-        videoRef.current.play().catch(() => {});
+        if (liveVideo) {
+          if (videoRef.current.srcObject !== stream) {
+            videoRef.current.srcObject = stream;
+          }
+          videoRef.current.play().catch(() => {});
+        }
       }
 
-      if (audioRef.current && audioRef.current.srcObject !== stream) {
-        audioRef.current.srcObject = stream;
-      }
       if (audioRef.current) {
+        if (audioRef.current.srcObject !== stream) {
+          audioRef.current.srcObject = stream;
+        }
         audioRef.current.play().catch(() => {});
       }
     };
@@ -173,10 +209,14 @@ function RemoteParticipantCard({
         track.removeEventListener('ended', checkTracksAndPlay);
       });
     };
-  }, [stream]);
+  }, [stream, participant.is_video_off]);
 
   useEffect(() => {
     const handleUserInteraction = () => {
+      const audioCtx = getSharedAudioContext();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
       if (audioRef.current && audioRef.current.paused && stream) {
         audioRef.current.play().catch(() => {});
       }
@@ -581,16 +621,14 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       return;
     }
 
-    let audioCtx = null;
     let analyser = null;
     let source = null;
     let animFrame = null;
     let activeHold = 0;
 
     try {
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      if (AudioContextClass) {
-        audioCtx = new AudioContextClass();
+      const audioCtx = getSharedAudioContext();
+      if (audioCtx) {
         analyser = audioCtx.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.4;
@@ -630,8 +668,8 @@ export default function VirtualSessionRoom({ session, onLeave }) {
       if (source) {
         try { source.disconnect(); } catch (_) {}
       }
-      if (audioCtx) {
-        audioCtx.close().catch(() => {});
+      if (analyser) {
+        try { analyser.disconnect(); } catch (_) {}
       }
     };
   }, [stream, isAudioMuted]);
@@ -723,16 +761,16 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         newStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: nextMode },
-            width: { ideal: 1280, min: 640, max: 1920 },
-            height: { ideal: 720, min: 480, max: 1080 },
-            frameRate: { ideal: 30, min: 15, max: 60 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 },
           },
           audio: false,
         });
       } catch (hdErr) {
         console.warn('[WebRTC] HD camera flip fallback:', hdErr);
         newStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: nextMode },
+          video: { facingMode: { ideal: nextMode } },
           audio: false,
         });
       }
@@ -1092,26 +1130,20 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           if (pc.restartIce) {
             pc.restartIce();
           }
-        } else if (pc.iceConnectionState === 'closed') {
-          closePeerConnection(peerKey);
-          setParticipants((prev) => prev.filter((p) => String(p.user_id) !== peerKey));
+          if (shouldInitiateWith(peerKey)) {
+            initiatePeerConnection(peerKey);
+          }
         }
       };
 
       pc.onconnectionstatechange = () => {
         console.log(`[WebRTC] Connection state with ${peerKey}:`, pc.connectionState);
-        if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-          closePeerConnection(peerKey);
-          setParticipants((prev) => prev.filter((p) => String(p.user_id) !== peerKey));
-        } else if (pc.connectionState === 'disconnected') {
-          setTimeout(() => {
-            const currentPc = peerConnectionsRef.current[peerKey];
-            if (currentPc && (currentPc.connectionState === 'disconnected' || currentPc.connectionState === 'failed')) {
-              console.log(`[WebRTC] Peer ${peerKey} remained disconnected, cleaning up.`);
-              closePeerConnection(peerKey);
-              setParticipants((prev) => prev.filter((p) => String(p.user_id) !== peerKey));
-            }
-          }, 4000);
+        if (pc.connectionState === 'failed') {
+          console.warn(`[WebRTC] Peer ${peerKey} connection failed, attempting reconnection`);
+          if (shouldInitiateWith(peerKey)) {
+            if (pc.restartIce) pc.restartIce();
+            initiatePeerConnection(peerKey);
+          }
         }
       };
 
@@ -1124,7 +1156,10 @@ export default function VirtualSessionRoom({ session, onLeave }) {
     if (localStreamRef.current) {
       const senders = pc.getSenders();
       localStreamRef.current.getTracks().forEach((track) => {
-        if (!senders.some((s) => s.track === track)) {
+        const sender = senders.find((s) => s.track === track || (!s.track && s.track !== undefined));
+        if (sender) {
+          sender.replaceTrack(track).catch(() => {});
+        } else if (!senders.some((s) => s.track === track)) {
           console.log(`[WebRTC] Attaching local track ${track.kind} to peer ${peerKey}`);
           pc.addTrack(track, localStreamRef.current);
         }
@@ -1174,7 +1209,12 @@ export default function VirtualSessionRoom({ session, onLeave }) {
 
       if (pc.signalingState !== 'stable') return;
 
-      await pc.setLocalDescription(offer);
+      const tunedOffer = new RTCSessionDescription({
+        type: offer.type,
+        sdp: tuneSdp(offer.sdp),
+      });
+
+      await pc.setLocalDescription(tunedOffer);
       sendSignal(peerKey, {
         type: 'offer',
         sdp: pc.localDescription,
@@ -1225,7 +1265,10 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         if (localStreamRef.current) {
           const senders = pc.getSenders();
           localStreamRef.current.getTracks().forEach((track) => {
-            if (!senders.some((s) => s.track === track)) {
+            const sender = senders.find((s) => s.track === track || (!s.track && s.track !== undefined));
+            if (sender) {
+              sender.replaceTrack(track).catch(() => {});
+            } else if (!senders.some((s) => s.track === track)) {
               pc.addTrack(track, localStreamRef.current);
             }
           });
@@ -1244,7 +1287,11 @@ export default function VirtualSessionRoom({ session, onLeave }) {
         }
 
         const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+        const tunedAnswer = new RTCSessionDescription({
+          type: answer.type,
+          sdp: tuneSdp(answer.sdp),
+        });
+        await pc.setLocalDescription(tunedAnswer);
 
         sendSignal(peerKey, {
           type: 'answer',
@@ -1371,9 +1418,9 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           localStream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: facingMode },
-              width: { ideal: 1280, min: 640, max: 1920 },
-              height: { ideal: 720, min: 480, max: 1080 },
-              frameRate: { ideal: 30, min: 15, max: 60 },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30 },
             },
             audio: {
               echoCancellation: true,
@@ -1385,7 +1432,7 @@ export default function VirtualSessionRoom({ session, onLeave }) {
           console.warn('[WebRTC] HD camera unavailable, trying standard video/audio:', camErr);
           try {
             localStream = await navigator.mediaDevices.getUserMedia({
-              video: true,
+              video: { facingMode: { ideal: facingMode } },
               audio: true,
             });
           } catch (camErr2) {
@@ -1655,14 +1702,111 @@ export default function VirtualSessionRoom({ session, onLeave }) {
   };
 
   // Toggle Camera
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     const nextVideoOff = !isVideoOff;
     setIsVideoOff(nextVideoOff);
 
-    if (stream) {
-      stream.getVideoTracks().forEach((track) => {
-        track.enabled = !nextVideoOff;
+    if (nextVideoOff) {
+      // Turning camera OFF
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((track) => {
+          track.enabled = false;
+        });
+      }
+      if (stream) {
+        stream.getVideoTracks().forEach((track) => {
+          track.enabled = false;
+        });
+      }
+      Object.values(peerConnectionsRef.current).forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender && sender.track) {
+          sender.track.enabled = false;
+        }
       });
+    } else {
+      // Turning camera ON
+      let existingTrack = localStreamRef.current?.getVideoTracks().find((t) => t.readyState === 'live');
+
+      if (!existingTrack) {
+        // Acquire video track via getUserMedia
+        try {
+          let newStream = null;
+          try {
+            newStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: { ideal: facingMode },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 },
+              },
+              audio: false,
+            });
+          } catch (camErr) {
+            newStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: facingMode } },
+              audio: false,
+            });
+          }
+
+          const newVideoTrack = newStream?.getVideoTracks()[0];
+          if (newVideoTrack) {
+            if (localStreamRef.current) {
+              localStreamRef.current.getVideoTracks().forEach((t) => localStreamRef.current.removeTrack(t));
+              localStreamRef.current.addTrack(newVideoTrack);
+            } else {
+              localStreamRef.current = new MediaStream([newVideoTrack]);
+            }
+
+            const updatedStream = new MediaStream(localStreamRef.current.getTracks());
+            setStream(updatedStream);
+
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = updatedStream;
+              localVideoRef.current.play().catch(() => {});
+            }
+            if (minimizedVideoRef.current) {
+              minimizedVideoRef.current.srcObject = updatedStream;
+              minimizedVideoRef.current.play().catch(() => {});
+            }
+
+            // Replace or add track on all active peer connections
+            Object.entries(peerConnectionsRef.current).forEach(([peerId, pc]) => {
+              const videoSender = pc.getSenders().find((s) => (s.track && s.track.kind === 'video') || (!s.track && s.track !== undefined));
+              if (videoSender) {
+                videoSender.replaceTrack(newVideoTrack).catch((err) => {
+                  console.warn('[WebRTC] replaceTrack error, renegotiating:', err);
+                  initiatePeerConnection(peerId);
+                });
+              } else {
+                pc.addTrack(newVideoTrack, localStreamRef.current);
+                initiatePeerConnection(peerId);
+              }
+              optimizeVideoSender(pc);
+            });
+          }
+        } catch (err) {
+          console.error('[WebRTC] Error acquiring camera in toggleVideo:', err);
+          setIsVideoOff(true);
+          return;
+        }
+      } else {
+        // Track exists and is live, simply enable
+        existingTrack.enabled = true;
+        if (localStreamRef.current) {
+          localStreamRef.current.getVideoTracks().forEach((t) => (t.enabled = true));
+        }
+        if (stream) {
+          stream.getVideoTracks().forEach((t) => (t.enabled = true));
+        }
+        Object.values(peerConnectionsRef.current).forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+          if (sender && sender.track) {
+            sender.track.enabled = true;
+          }
+          optimizeVideoSender(pc);
+        });
+      }
     }
 
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

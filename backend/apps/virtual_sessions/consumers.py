@@ -21,6 +21,7 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
 
         self.session_id = self.scope['url_route']['kwargs']['session_id']
         self.session_group_name = f"session_{self.session_id}"
+        self.user_group_name = f"session_{self.session_id}_user_{self.user.id}"
 
         # Check if this connection is only for waiting room
         query_string = self.scope.get('query_string', b'').decode('utf-8')
@@ -29,6 +30,12 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
         # Join session group
         await self.channel_layer.group_add(
             self.session_group_name,
+            self.channel_name
+        )
+
+        # Join targeted user group for fast 1-on-1 WebRTC signaling
+        await self.channel_layer.group_add(
+            self.user_group_name,
             self.channel_name
         )
 
@@ -64,6 +71,12 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
         if hasattr(self, 'session_group_name'):
             await self.channel_layer.group_discard(
                 self.session_group_name,
+                self.channel_name
+            )
+
+        if hasattr(self, 'user_group_name'):
+            await self.channel_layer.group_discard(
+                self.user_group_name,
                 self.channel_name
             )
 
@@ -107,8 +120,12 @@ class SessionSignalingConsumer(AsyncWebsocketConsumer):
                 target_user_id = data.get('target_user_id')
                 if target_user_id is not None:
                     target_user_id = str(target_user_id)
+                    dest_group = f"session_{self.session_id}_user_{target_user_id}"
+                else:
+                    dest_group = self.session_group_name
+
                 await self.channel_layer.group_send(
-                    self.session_group_name,
+                    dest_group,
                     {
                         'type': 'webrtc_signal_forward',
                         'from_user_id': str(self.user.id),
