@@ -26,6 +26,7 @@ import VoiceRecorder from './VoiceRecorder';
 import MessageAttachment from './MessageAttachment';
 import MessageReactions, { ReactionBar } from './MessageReactions';
 import ContactRequestsView from './ContactRequestsView';
+import UserAvatar from '../common/UserAvatar';
 import api from '../../api/client';
 
 export default function DirectMessageArea({ onOpenMobileNav }) {
@@ -262,22 +263,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
                     className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-discord-sidebar/60 hover:bg-discord-hover transition cursor-pointer border border-white/5 group"
                   >
                     <div className="flex items-center space-x-3 min-w-0">
-                      <div className="relative flex-shrink-0">
-                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-discord-blurple flex items-center justify-center text-xs font-bold text-white">
-                          {partner?.avatar_url ? (
-                            <img
-                              src={partner.avatar_url}
-                              alt={partner.username}
-                              className="w-full h-full rounded-full object-cover"
-                            />
-                          ) : (
-                            partner?.username?.[0]?.toUpperCase() || 'U'
-                          )}
-                        </div>
-                        {partner?.is_online && (
-                          <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-sidebar" />
-                        )}
-                      </div>
+                      <UserAvatar user={partner} size="sm" showOnline={true} />
                       <div className="min-w-0">
                         <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block truncate max-w-[140px] sm:max-w-xs">
                           @{partner?.username || 'Usuario'}
@@ -321,24 +307,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
             </button>
           )}
 
-          <div className="relative flex-shrink-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-discord-blurple flex items-center justify-center text-xs font-bold text-white overflow-hidden">
-              {otherUser.avatar_url ? (
-                <img
-                  src={otherUser.avatar_url}
-                  alt={otherUser.username}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                otherUser.username?.[0]?.toUpperCase() || 'U'
-              )}
-            </div>
-            <div
-              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-discord-chat ${
-                otherUser.is_online ? 'bg-discord-green' : 'bg-discord-text-muted'
-              }`}
-            />
-          </div>
+          <UserAvatar user={otherUser} size="sm" showOnline={true} />
 
           <div className="min-w-0">
             <div className="flex items-center space-x-2">
@@ -524,17 +493,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
         {/* Welcome Header */}
         {!searchQuery && (
           <div className="mb-6 pt-4 select-none">
-            <div className="w-20 h-20 rounded-full bg-discord-blurple flex items-center justify-center mb-3 text-white text-2xl font-bold overflow-hidden shadow-lg">
-              {otherUser.avatar_url ? (
-                <img
-                  src={otherUser.avatar_url}
-                  alt={otherUser.username}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                otherUser.username?.[0]?.toUpperCase() || 'U'
-              )}
-            </div>
+            <UserAvatar user={otherUser} size="xl" className="mb-3" />
             <h2 className="text-2xl sm:text-3xl font-bold text-white">
               @{otherUser.username}
             </h2>
@@ -577,17 +536,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
                 </div>
 
                 {!isSameSenderSameMinute ? (
-                  <div className="w-10 h-10 rounded-full bg-discord-blurple flex-shrink-0 flex items-center justify-center font-bold text-white text-sm overflow-hidden select-none">
-                    {msg.sender?.avatar_url ? (
-                      <img
-                        src={msg.sender.avatar_url}
-                        alt={msg.sender.username}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      msg.sender?.username?.[0]?.toUpperCase() || 'U'
-                    )}
-                  </div>
+                  <UserAvatar user={msg.sender} size="md" />
                 ) : (
                   <div className="w-10 flex-shrink-0 text-right pr-1 select-none">
                     <span className="text-[10px] text-discord-text-muted opacity-0 group-hover:opacity-100 transition">

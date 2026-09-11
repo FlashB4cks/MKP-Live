@@ -21,6 +21,7 @@ import InviteModal from '../modals/InviteModal';
 import ConfirmModal from '../modals/ConfirmModal';
 import StartDMModal from '../modals/StartDMModal';
 import AccountSettingsModal from '../modals/AccountSettingsModal';
+import UserAvatar from '../common/UserAvatar';
 
 export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
   const activeServer = useServerStore((state) => state.activeServer);
@@ -329,22 +330,7 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
                         }`}
                       >
                         <div className="flex items-center min-w-0 space-x-2.5">
-                          <div className="relative flex-shrink-0">
-                            <div className="w-8 h-8 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-xs overflow-hidden">
-                              {partner?.avatar_url ? (
-                                <img
-                                  src={partner.avatar_url}
-                                  alt={partner.username}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                partner?.username?.[0]?.toUpperCase() || 'U'
-                              )}
-                            </div>
-                            {partner?.is_online && (
-                              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-channels" />
-                            )}
-                          </div>
+                          <UserAvatar user={partner} size="sm" showOnline={true} />
 
                           <div className="min-w-0">
                             <div className="flex items-center space-x-1.5">
@@ -403,21 +389,7 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
           className="flex items-center space-x-2 min-w-0 flex-1 p-1 rounded-lg hover:bg-white/5 cursor-pointer transition mr-1"
           title="Ajustes de mi cuenta"
         >
-          <div className="relative flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-xs overflow-hidden shadow">
-              {user?.avatar_url ? (
-                <img
-                  src={user.avatar_url}
-                  alt={user.username}
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                user?.username?.[0]?.toUpperCase() || 'U'
-              )}
-            </div>
-            {/* Green Online Dot */}
-            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-channels" />
-          </div>
+          <UserAvatar user={user} size="sm" showOnline={true} />
 
           <div className="min-w-0">
             <div className="text-xs font-semibold text-white truncate">

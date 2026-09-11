@@ -20,6 +20,7 @@ import VoiceRecorder from './VoiceRecorder';
 import MessageAttachment from './MessageAttachment';
 import MessageReactions, { ReactionBar } from './MessageReactions';
 import ConfirmModal from '../modals/ConfirmModal';
+import UserAvatar from '../common/UserAvatar';
 import api from '../../api/client';
 
 export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav }) {
@@ -357,17 +358,7 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
                 </div>
 
                 {!isSameAuthorSameMinute ? (
-                  <div className="w-10 h-10 rounded-full bg-discord-blurple flex-shrink-0 flex items-center justify-center font-bold text-white text-sm overflow-hidden select-none">
-                    {msg.author?.avatar_url ? (
-                      <img
-                        src={msg.author.avatar_url}
-                        alt={msg.author.username}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      msg.author?.username?.[0]?.toUpperCase() || 'U'
-                    )}
-                  </div>
+                  <UserAvatar user={msg.author} size="md" />
                 ) : (
                   <div className="w-10 flex-shrink-0 text-right pr-1 select-none">
                     <span className="text-[10px] text-discord-text-muted opacity-0 group-hover:opacity-100 transition">

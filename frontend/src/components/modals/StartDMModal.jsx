@@ -4,6 +4,7 @@ import { Search, X, MessageSquare, Loader2, User, UserPlus, Clock } from 'lucide
 import api from '../../api/client';
 import { useDMStore } from '../../store/dmStore';
 import { useAuthStore } from '../../store/authStore';
+import UserAvatar from '../common/UserAvatar';
 
 export default function StartDMModal({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -153,22 +154,7 @@ export default function StartDMModal({ isOpen, onClose }) {
                   className="flex items-center justify-between p-2.5 rounded-xl hover:bg-discord-hover transition cursor-pointer group"
                 >
                   <div className="flex items-center space-x-3 min-w-0">
-                    <div className="relative flex-shrink-0">
-                      <div className="w-9 h-9 rounded-full bg-discord-blurple flex items-center justify-center text-sm font-bold text-white">
-                        {targetUser.avatar_url ? (
-                          <img
-                            src={targetUser.avatar_url}
-                            alt={targetUser.username}
-                            className="w-full h-full rounded-full object-cover"
-                          />
-                        ) : (
-                          targetUser.username?.[0]?.toUpperCase()
-                        )}
-                      </div>
-                      {targetUser.is_online && (
-                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-chat" />
-                      )}
-                    </div>
+                    <UserAvatar user={targetUser} size="sm" showOnline={true} />
 
                     <div className="min-w-0">
                       <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block truncate">

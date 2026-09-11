@@ -17,6 +17,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { getMediaUrl } from '../../utils/media';
 
 export default function AccountSettingsModal({ isOpen, onClose }) {
   const user = useAuthStore((state) => state.user);
@@ -63,7 +64,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       setEmail(user.email || '');
       setBio(user.bio || '');
       setStatusText(user.status_text || '');
-      setAvatarPreview(user.avatar_url || user.avatar || null);
+      setAvatarPreview(getMediaUrl(user.avatar_url || user.avatar) || null);
       setAvatarFile(null);
       setRemoveAvatar(false);
       setProfileError(null);
@@ -349,8 +350,9 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                     <div className="w-20 h-20 rounded-full bg-discord-blurple flex items-center justify-center text-3xl font-bold text-white overflow-hidden shadow-xl border-2 border-white/10">
                       {avatarPreview ? (
                         <img
-                          src={avatarPreview}
-                          alt="Avatar preview"
+                          src={getMediaUrl(avatarPreview)}
+                          alt=""
+                          onError={() => setAvatarPreview(null)}
                           className="w-full h-full object-cover"
                         />
                       ) : (

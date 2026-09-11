@@ -3,7 +3,7 @@ from django.contrib.auth.password_validation import validate_password
 from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
-    avatar_url = serializers.ReadOnlyField()
+    avatar_url = serializers.SerializerMethodField()
     avatar = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
@@ -13,6 +13,15 @@ class UserSerializer(serializers.ModelSerializer):
             'bio', 'status_text', 'is_online', 'created_at'
         ]
         read_only_fields = ['id', 'created_at', 'is_online']
+
+    def get_avatar_url(self, obj):
+        if obj.avatar and hasattr(obj.avatar, 'url'):
+            url = obj.avatar.url
+            request = self.context.get('request')
+            if request and not (url.startswith('http://') or url.startswith('https://')):
+                return request.build_absolute_uri(url)
+            return url
+        return None
 
     def validate_username(self, value):
         user = self.instance

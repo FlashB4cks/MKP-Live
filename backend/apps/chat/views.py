@@ -98,6 +98,21 @@ class DMConversationListView(APIView):
             initiated_by=request.user
         )
         conv.participants.add(request.user, target_user)
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{target_user.id}",
+                    {
+                        'type': 'dm_status_broadcast',
+                        'conversation_id': str(conv.id),
+                        'status': 'PENDING',
+                    }
+                )
+            except Exception:
+                pass
+
         serializer = DMConversationSerializer(conv, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -141,7 +156,6 @@ class DirectMessageListView(APIView):
 
         data = DirectMessageSerializer(msg, context={'request': request}).data
 
-        # Broadcast via Channels
         channel_layer = get_channel_layer()
         if channel_layer:
             try:
@@ -152,6 +166,14 @@ class DirectMessageListView(APIView):
                         'message': data,
                     }
                 )
+                for p in conv.participants.exclude(id=request.user.id):
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{p.id}",
+                        {
+                            'type': 'dm_message_broadcast',
+                            'message': data,
+                        }
+                    )
             except Exception:
                 pass
 
@@ -259,6 +281,14 @@ class ChatFileUploadView(APIView):
                             'message': data,
                         }
                     )
+                    for p in conv.participants.exclude(id=request.user.id):
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{p.id}",
+                            {
+                                'type': 'dm_message_broadcast',
+                                'message': data,
+                            }
+                        )
                 except Exception:
                     pass
 
@@ -379,6 +409,15 @@ class DirectMessageAcceptView(APIView):
                         'status': 'ACCEPTED',
                     }
                 )
+                for p in conv.participants.all():
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{p.id}",
+                        {
+                            'type': 'dm_status_broadcast',
+                            'conversation_id': str(conversation_id),
+                            'status': 'ACCEPTED',
+                        }
+                    )
             except Exception:
                 pass
 
@@ -394,6 +433,7 @@ class DirectMessageRejectView(APIView):
         if not conv.participants.filter(id=request.user.id).exists():
             raise permissions.exceptions.PermissionDenied("No eres participante de esta conversación.")
 
+        participants = list(conv.participants.all())
         channel_layer = get_channel_layer()
         if channel_layer:
             try:
@@ -405,6 +445,15 @@ class DirectMessageRejectView(APIView):
                         'status': 'REJECTED',
                     }
                 )
+                for p in participants:
+                    async_to_sync(channel_layer.group_send)(
+                        f"user_{p.id}",
+                        {
+                            'type': 'dm_status_broadcast',
+                            'conversation_id': str(conversation_id),
+                            'status': 'REJECTED',
+                        }
+                    )
             except Exception:
                 pass
 

@@ -7,12 +7,15 @@ import DirectMessageArea from '../components/chat/DirectMessageArea';
 import MemberSidebar from '../components/members/MemberSidebar';
 import VirtualSessionRoom from '../components/sessions/VirtualSessionRoom';
 import AccountSettingsModal from '../components/modals/AccountSettingsModal';
+import UserAvatar from '../components/common/UserAvatar';
 import { useServerStore } from '../store/serverStore';
 import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
+import { useSocketStore } from '../store/socketStore';
 
 export default function MainLayout() {
   const user = useAuthStore((state) => state.user);
+  const token = useAuthStore((state) => state.token);
   const fetchServers = useServerStore((state) => state.fetchServers);
   const activeServer = useServerStore((state) => state.activeServer);
   const isDMView = useServerStore((state) => state.isDMView);
@@ -31,6 +34,12 @@ export default function MainLayout() {
     fetchServers();
     restoreActiveSession();
   }, [fetchServers, restoreActiveSession]);
+
+  useEffect(() => {
+    if (token) {
+      useSocketStore.getState().connect(token);
+    }
+  }, [token]);
 
   const showDMs = isDMView || !activeServer;
 
@@ -162,13 +171,7 @@ export default function MainLayout() {
           className="flex flex-col items-center justify-center flex-1 py-1 text-discord-text-muted hover:text-white transition"
           title="Mi Perfil y Ajustes"
         >
-          <div className="w-5 h-5 rounded-full bg-discord-blurple flex items-center justify-center text-[10px] font-bold text-white overflow-hidden shadow">
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              user?.username?.[0]?.toUpperCase() || 'U'
-            )}
-          </div>
+          <UserAvatar user={user} size="xs" className="w-5 h-5" />
           <span className="text-[10px] mt-0.5 font-medium">Tú</span>
         </button>
       </nav>

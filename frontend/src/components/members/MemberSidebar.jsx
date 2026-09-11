@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useDMStore } from '../../store/dmStore';
 import ManageMemberModal from '../modals/ManageMemberModal';
 import ConfirmModal from '../modals/ConfirmModal';
+import UserAvatar from '../common/UserAvatar';
 
 export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }) {
   const members = useServerStore((state) => state.members);
@@ -53,24 +54,7 @@ export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }
         title={!isMe ? `Enviar mensaje directo a @${member.user.username}` : undefined}
       >
         {/* Avatar with Status Dot */}
-        <div className="relative mr-3 flex-shrink-0">
-          <div className="w-8 h-8 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-xs overflow-hidden">
-            {member.user.avatar_url ? (
-              <img
-                src={member.user.avatar_url}
-                alt={member.user.username}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              member.user.username?.[0]?.toUpperCase() || 'U'
-            )}
-          </div>
-          <div
-            className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-discord-channels ${
-              member.user.is_online ? 'bg-discord-green' : 'bg-discord-text-muted'
-            }`}
-          />
-        </div>
+        <UserAvatar user={member.user} size="sm" showOnline={true} className="mr-3" />
 
         {/* Member Info */}
         <div className="flex-1 min-w-0 flex items-center justify-between">

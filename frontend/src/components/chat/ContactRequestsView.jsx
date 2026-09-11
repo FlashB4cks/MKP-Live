@@ -17,6 +17,7 @@ import { useDMStore } from '../../store/dmStore';
 import { useAuthStore } from '../../store/authStore';
 import StartDMModal from '../modals/StartDMModal';
 import ConfirmModal from '../modals/ConfirmModal';
+import UserAvatar from '../common/UserAvatar';
 import api from '../../api/client';
 
 export default function ContactRequestsView({ onOpenMobileNav }) {
@@ -290,22 +291,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                       className="p-3 sm:p-4 flex items-center justify-between hover:bg-white/[0.03] transition gap-3"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-sm overflow-hidden">
-                            {partner.avatar_url ? (
-                              <img
-                                src={partner.avatar_url}
-                                alt={partner.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              partner.username?.[0]?.toUpperCase() || 'U'
-                            )}
-                          </div>
-                          {partner.is_online && (
-                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-chat" />
-                          )}
-                        </div>
+                        <UserAvatar user={partner} size="md" showOnline={true} />
 
                         <div className="min-w-0">
                           <span className="text-sm font-bold text-white block truncate">
@@ -380,19 +366,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                       className="p-3 sm:p-4 flex items-center justify-between hover:bg-white/[0.03] transition gap-3"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-sm overflow-hidden">
-                            {partner.avatar_url ? (
-                              <img
-                                src={partner.avatar_url}
-                                alt={partner.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              partner.username?.[0]?.toUpperCase() || 'U'
-                            )}
-                          </div>
-                        </div>
+                        <UserAvatar user={partner} size="md" showOnline={false} />
 
                         <div className="min-w-0">
                           <span className="text-sm font-bold text-white block truncate">
@@ -456,22 +430,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                       className="p-3 sm:p-4 flex items-center justify-between hover:bg-white/[0.04] transition cursor-pointer group"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
-                        <div className="relative flex-shrink-0">
-                          <div className="w-10 h-10 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-sm overflow-hidden">
-                            {partner.avatar_url ? (
-                              <img
-                                src={partner.avatar_url}
-                                alt={partner.username}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              partner.username?.[0]?.toUpperCase() || 'U'
-                            )}
-                          </div>
-                          {partner.is_online && (
-                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-chat" />
-                          )}
-                        </div>
+                        <UserAvatar user={partner} size="md" showOnline={true} />
 
                         <div className="min-w-0">
                           <div className="flex items-center space-x-2">

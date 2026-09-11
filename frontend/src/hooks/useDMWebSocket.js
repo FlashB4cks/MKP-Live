@@ -1,109 +1,38 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { useDMStore } from '../store/dmStore';
+import { useEffect, useCallback } from 'react';
+import { useSocketStore } from '../store/socketStore';
 
 export function useDMWebSocket(conversationId, token) {
-  const wsRef = useRef(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const addMessage = useDMStore((state) => state.addMessage);
-  const updateMessageReactions = useDMStore((state) => state.updateMessageReactions);
-  const setTypingUser = useDMStore((state) => state.setTypingUser);
-  const handleClearChat = useDMStore((state) => state.handleClearChat);
-  const setConversationStatus = useDMStore((state) => state.setConversationStatus);
-  const handleConversationDeleted = useDMStore((state) => state.handleConversationDeleted);
-  const reconnectTimeoutRef = useRef(null);
+  const isConnected = useSocketStore((state) => state.isConnected);
+  const subscribeDM = useSocketStore((state) => state.subscribeDM);
+  const sendDMMessage = useSocketStore((state) => state.sendDMMessage);
+  const sendTypingSocket = useSocketStore((state) => state.sendTyping);
+  const connect = useSocketStore((state) => state.connect);
 
   useEffect(() => {
-    if (!conversationId || !token) {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      setIsConnected(false);
-      return;
+    if (token) {
+      connect(token);
     }
+  }, [token, connect]);
 
-    let isMounted = true;
-
-    function connect() {
-      const rawHost = import.meta.env.VITE_WS_URL || window.location.host;
-      const cleanHost = rawHost.replace(/^https?:\/\//, '').replace(/^wss?:\/\//, '').replace(/\/+$/, '');
-      const protocol = window.location.protocol === 'https:' || rawHost.startsWith('https:') || rawHost.startsWith('wss:') ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${cleanHost}/ws/dms/${conversationId}/?token=${token}`;
-
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        if (!isMounted) return;
-        setIsConnected(true);
-      };
-
-      ws.onmessage = (event) => {
-        if (!isMounted) return;
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'chat_message') {
-            addMessage(data.message);
-          } else if (data.type === 'message_reaction') {
-            updateMessageReactions(data.message_id, data.reactions);
-          } else if (data.type === 'clear_chat') {
-            handleClearChat(data.conversation_id);
-          } else if (data.type === 'conversation_status') {
-            setConversationStatus(data.conversation_id, data.status);
-          } else if (data.type === 'conversation_deleted') {
-            handleConversationDeleted(data.conversation_id);
-          } else if (data.type === 'typing') {
-            setTypingUser(data.username, data.is_typing);
-          }
-        } catch (err) {
-          console.error('Error parsing DM WS message', err);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.warn('DM WebSocket error', error);
-      };
-
-      ws.onclose = (event) => {
-        if (!isMounted) return;
-        setIsConnected(false);
-        if (event.code !== 1000 && event.code !== 4001 && event.code !== 4003) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (isMounted) connect();
-          }, 3000);
-        }
-      };
+  useEffect(() => {
+    if (conversationId) {
+      subscribeDM(conversationId);
     }
-
-    connect();
-
-    return () => {
-      isMounted = false;
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close(1000);
-      }
-    };
-  }, [conversationId, token, addMessage, setTypingUser]);
+  }, [conversationId, subscribeDM]);
 
   const sendMessage = useCallback((content) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'chat_message',
-        content,
-      }));
+    if (conversationId) {
+      return sendDMMessage(conversationId, content);
     }
-  }, []);
+    return false;
+  }, [conversationId, sendDMMessage]);
 
   const sendTyping = useCallback((isTyping) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'typing',
-        is_typing: isTyping,
-      }));
+    if (conversationId) {
+      sendTypingSocket(isTyping, null, conversationId);
     }
-  }, []);
+  }, [conversationId, sendTypingSocket]);
 
   return { isConnected, sendMessage, sendTyping };
 }
+

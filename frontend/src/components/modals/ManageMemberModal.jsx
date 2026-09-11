@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Shield, X, Check, Trash2, UserMinus } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
+import UserAvatar from '../common/UserAvatar';
 
 export default function ManageMemberModal({ isOpen, onClose, member, serverId, isOwner }) {
   const updateMemberPermissions = useServerStore((state) => state.updateMemberPermissions);
@@ -102,17 +103,7 @@ export default function ManageMemberModal({ isOpen, onClose, member, serverId, i
         <form onSubmit={handleSave} className="p-4 space-y-4">
           {/* Member preview card */}
           <div className="flex items-center space-x-3 p-3 rounded-xl bg-discord-sidebar/60 border border-white/5">
-            <div className="w-10 h-10 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-sm overflow-hidden">
-              {member.user.avatar_url ? (
-                <img
-                  src={member.user.avatar_url}
-                  alt={member.user.username}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                member.user.username?.[0]?.toUpperCase() || 'U'
-              )}
-            </div>
+            <UserAvatar user={member.user} size="md" />
             <div>
               <span className="font-semibold text-white text-sm block">
                 {member.nickname || member.user.username}
