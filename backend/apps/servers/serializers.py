@@ -5,11 +5,23 @@ from channels_app.serializers import ChannelSerializer
 
 class ServerMemberSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = ServerMember
-        fields = ['id', 'user', 'role', 'nickname', 'joined_at']
+        fields = [
+            'id', 'user', 'role', 'nickname',
+            'can_manage_messages', 'can_manage_members',
+            'permissions', 'joined_at'
+        ]
         read_only_fields = ['id', 'joined_at']
+
+    def get_permissions(self, obj):
+        return {
+            'manage_messages': obj.has_manage_messages_permission(),
+            'manage_members': obj.has_manage_members_permission(),
+            'is_admin': obj.is_admin_or_owner(),
+        }
 
 class ServerSerializer(serializers.ModelSerializer):
     icon_url = serializers.ReadOnlyField()
@@ -17,12 +29,14 @@ class ServerSerializer(serializers.ModelSerializer):
     members_count = serializers.SerializerMethodField()
     channels_count = serializers.SerializerMethodField()
     my_role = serializers.SerializerMethodField()
+    my_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = Server
         fields = [
             'id', 'name', 'description', 'icon', 'icon_url',
-            'owner', 'members_count', 'channels_count', 'my_role', 'created_at'
+            'owner', 'members_count', 'channels_count',
+            'my_role', 'my_permissions', 'created_at'
         ]
         read_only_fields = ['id', 'owner', 'created_at']
 
@@ -38,6 +52,22 @@ class ServerSerializer(serializers.ModelSerializer):
             member = obj.members.filter(user=request.user).first()
             return member.role if member else None
         return None
+
+    def get_my_permissions(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            member = obj.members.filter(user=request.user).first()
+            if member:
+                return {
+                    'manage_messages': member.has_manage_messages_permission(),
+                    'manage_members': member.has_manage_members_permission(),
+                    'is_admin': member.is_admin_or_owner(),
+                }
+        return {
+            'manage_messages': False,
+            'manage_members': False,
+            'is_admin': False,
+        }
 
 class ServerDetailSerializer(ServerSerializer):
     channels = ChannelSerializer(many=True, read_only=True)

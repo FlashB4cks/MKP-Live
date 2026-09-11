@@ -7,6 +7,7 @@ export function useChatWebSocket(channelId, token) {
   const [isConnected, setIsConnected] = useState(false);
   const addMessage = useChatStore((state) => state.addMessage);
   const updateMessageReactions = useChatStore((state) => state.updateMessageReactions);
+  const removeMessageById = useChatStore((state) => state.removeMessageById);
   const setTypingUser = useChatStore((state) => state.setTypingUser);
   const updateMemberPresence = useServerStore((state) => state.updateMemberPresence);
   const reconnectTimeoutRef = useRef(null);
@@ -45,6 +46,8 @@ export function useChatWebSocket(channelId, token) {
             addMessage(data.message);
           } else if (data.type === 'message_reaction') {
             updateMessageReactions(data.message_id, data.reactions);
+          } else if (data.type === 'message_deleted') {
+            removeMessageById(data.message_id);
           } else if (data.type === 'typing') {
             setTypingUser(data.user_id, data.username, data.is_typing);
           } else if (data.type === 'presence') {

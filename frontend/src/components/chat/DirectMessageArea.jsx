@@ -9,11 +9,18 @@ import {
   Search,
   X,
   Loader2,
+  MoreVertical,
+  Trash2,
+  Eraser,
+  Check,
+  XCircle,
+  Clock,
 } from 'lucide-react';
 import { useDMStore } from '../../store/dmStore';
 import { useAuthStore } from '../../store/authStore';
 import { useDMWebSocket } from '../../hooks/useDMWebSocket';
 import StartDMModal from '../modals/StartDMModal';
+import ConfirmModal from '../modals/ConfirmModal';
 import VoiceRecorder from './VoiceRecorder';
 import MessageAttachment from './MessageAttachment';
 import MessageReactions, { ReactionBar } from './MessageReactions';
@@ -28,6 +35,10 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
   const selectConversation = useDMStore((state) => state.selectConversation);
   const sendDirectMessage = useDMStore((state) => state.sendDirectMessage);
   const updateMessageReactions = useDMStore((state) => state.updateMessageReactions);
+  const acceptDMRequest = useDMStore((state) => state.acceptDMRequest);
+  const rejectDMRequest = useDMStore((state) => state.rejectDMRequest);
+  const clearConversationMessages = useDMStore((state) => state.clearConversationMessages);
+  const deleteConversation = useDMStore((state) => state.deleteConversation);
   const token = useAuthStore((state) => state.token);
   const currentUser = useAuthStore((state) => state.user);
 
@@ -36,9 +47,13 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [optionsMenuOpen, setOptionsMenuOpen] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const optionsMenuRef = useRef(null);
 
   // Hook WebSocket for real-time messages & typing in current DM conversation
   const { isConnected, sendMessage, sendTyping } = useDMWebSocket(
@@ -67,7 +82,24 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       is_online: false,
     };
 
+  const isPending = activeConversation?.status === 'PENDING';
+  const isAwaitingMyAcceptance =
+    isPending &&
+    (activeConversation?.awaiting_my_acceptance ||
+      String(activeConversation?.initiated_by) !== String(currentUser?.id));
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(e.target)) {
+        setOptionsMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleInputChange = (e) => {
+    if (isPending) return;
     setInputText(e.target.value);
 
     // Emit typing event to peer
@@ -336,6 +368,44 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
             )}
           </div>
 
+          {/* More Options Menu (Clear chat, Delete conversation) */}
+          <div className="relative" ref={optionsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setOptionsMenuOpen((v) => !v)}
+              className="p-1.5 hover:text-white transition rounded hover:bg-white/5"
+              title="Opciones del chat"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            {optionsMenuOpen && (
+              <div className="absolute right-0 mt-1 w-48 bg-discord-sidebar border border-white/10 rounded-lg shadow-xl py-1 z-30 animate-in fade-in select-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOptionsMenuOpen(false);
+                    setConfirmClearOpen(true);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 text-xs text-discord-text hover:text-white hover:bg-discord-hover transition text-left"
+                >
+                  <Eraser className="w-4 h-4 text-discord-yellow" />
+                  <span>Vaciar conversación</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOptionsMenuOpen(false);
+                    setConfirmDeleteOpen(true);
+                  }}
+                  className="w-full flex items-center space-x-2 px-3 py-2 text-xs text-discord-red hover:bg-discord-red hover:text-white transition text-left"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Eliminar chat</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div
             className="flex items-center space-x-1 text-xs"
             title={isConnected ? 'Conectado a WebSockets (MD en tiempo real)' : 'Conectando / Modo HTTP'}
@@ -354,6 +424,58 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
           </div>
         </div>
       </header>
+
+      {/* Pending Contact Request Banner */}
+      {isPending && (
+        <div className="bg-discord-sidebar/95 border-b border-discord-yellow/30 px-4 py-3 select-none flex-shrink-0">
+          {isAwaitingMyAcceptance ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-full bg-discord-yellow/20 text-discord-yellow flex-shrink-0">
+                  <MessageSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    Solicitud de contacto
+                  </span>
+                  <span className="text-[11px] text-discord-text-muted">
+                    @{otherUser.username} quiere ponerse en contacto contigo. ¿Deseas aceptar?
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await acceptDMRequest(activeConversation.id);
+                  }}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-discord-green hover:bg-discord-green/90 text-white rounded text-xs font-semibold shadow transition"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Aceptar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await rejectDMRequest(activeConversation.id);
+                  }}
+                  className="flex items-center space-x-1 px-3 py-1.5 bg-discord-red/20 hover:bg-discord-red text-discord-red hover:text-white rounded text-xs font-semibold transition"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  <span>Rechazar</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center space-x-2.5 text-discord-yellow text-xs">
+              <Clock className="w-4 h-4 flex-shrink-0 animate-pulse" />
+              <span>
+                Solicitud de contacto enviada. Esperando a que <strong>@{otherUser.username}</strong> acepte tu solicitud para chatear.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Search results banner */}
       {searchQuery.trim() && (
@@ -502,27 +624,35 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       <div className="px-2 sm:px-4 pb-16 md:pb-4 flex-shrink-0 select-none">
         <form
           onSubmit={handleSendMessage}
-          className="bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner"
+          className={`bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner ${
+            isPending ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
         >
-
           <input
             type="text"
+            disabled={isPending}
             value={inputText}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={`Enviar mensaje a @${otherUser.username}`}
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-discord-text-muted focus:outline-none"
+            placeholder={
+              isPending
+                ? isAwaitingMyAcceptance
+                  ? `Acepta la solicitud para chatear con @${otherUser.username}`
+                  : `Esperando a que @${otherUser.username} acepte la solicitud...`
+                : `Enviar mensaje a @${otherUser.username}`
+            }
+            className="flex-1 bg-transparent text-sm text-white placeholder:text-discord-text-muted focus:outline-none disabled:cursor-not-allowed"
           />
 
           {/* Voice Recorder button & controls */}
           <VoiceRecorder
             onSendAudio={handleSendVoiceNote}
-            disabled={isUploading}
+            disabled={isUploading || isPending}
           />
 
           <button
             type="submit"
-            disabled={!inputText.trim()}
+            disabled={isPending || !inputText.trim()}
             className="text-discord-text-muted hover:text-white transition disabled:opacity-30 p-1"
             title="Enviar mensaje"
           >
@@ -534,6 +664,36 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       <StartDMModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        onConfirm={async () => {
+          if (activeConversation?.id) {
+            await clearConversationMessages(activeConversation.id);
+            setConfirmClearOpen(false);
+          }
+        }}
+        title="Vaciar conversación"
+        message={`¿Estás seguro de que deseas vaciar todos los mensajes de la conversación con @${otherUser.username}?`}
+        confirmText="Vaciar Conversación"
+        danger={true}
+      />
+
+      <ConfirmModal
+        isOpen={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={async () => {
+          if (activeConversation?.id) {
+            await deleteConversation(activeConversation.id);
+            setConfirmDeleteOpen(false);
+          }
+        }}
+        title="Eliminar chat"
+        message={`¿Estás seguro de que deseas eliminar permanentemente el chat con @${otherUser.username}? Se borrará todo el historial.`}
+        confirmText="Eliminar Chat"
+        danger={true}
       />
     </main>
   );

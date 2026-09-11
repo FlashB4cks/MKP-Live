@@ -52,6 +52,8 @@ class ServerMember(models.Model):
         default=RoleChoices.MEMBER
     )
     nickname = models.CharField(max_length=50, blank=True, default='')
+    can_manage_messages = models.BooleanField(default=False)
+    can_manage_members = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -65,6 +67,15 @@ class ServerMember(models.Model):
 
     def __str__(self):
         return f"{self.user.username} in {self.server.name} ({self.role})"
+
+    def has_manage_messages_permission(self):
+        return self.role in [RoleChoices.OWNER, RoleChoices.ADMIN] or self.can_manage_messages
+
+    def has_manage_members_permission(self):
+        return self.role in [RoleChoices.OWNER, RoleChoices.ADMIN] or self.can_manage_members
+
+    def is_admin_or_owner(self):
+        return self.role in [RoleChoices.OWNER, RoleChoices.ADMIN]
 
 def generate_invite_code():
     return secrets.token_urlsafe(6)

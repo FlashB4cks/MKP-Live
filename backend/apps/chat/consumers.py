@@ -134,6 +134,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'reactions': event['reactions'],
         }))
 
+    async def message_deleted_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'message_id': event['message_id'],
+        }))
+
     async def typing_broadcast(self, event):
         # Don't send typing to self
         if event.get('user_id') != str(self.user.id):
@@ -234,6 +240,15 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
                 if not content:
                     return
 
+                # Verify that conversation is ACCEPTED before creating message
+                can_chat = await self.check_conversation_accepted(self.conversation_id)
+                if not can_chat:
+                    await self.send(text_data=json.dumps({
+                        'type': 'error',
+                        'message': 'La solicitud de contacto aún no ha sido aceptada.',
+                    }))
+                    return
+
                 msg_data = await self.create_direct_message(self.user, self.conversation_id, content)
 
                 await self.channel_layer.group_send(
@@ -281,6 +296,24 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
                 'is_typing': event['is_typing'],
             }))
 
+    async def dm_clear_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'clear_chat',
+            'conversation_id': event['conversation_id'],
+        }))
+
+    async def dm_status_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'conversation_status',
+            'status': event['status'],
+        }))
+
+    async def dm_deleted_broadcast(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'conversation_deleted',
+            'conversation_id': event['conversation_id'],
+        }))
+
     @database_sync_to_async
     def verify_conversation_participant(self, user, conversation_id):
         try:
@@ -289,6 +322,15 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
                 id=conversation_id,
                 participants=user
             ).exists()
+        except Exception:
+            return False
+
+    @database_sync_to_async
+    def check_conversation_accepted(self, conversation_id):
+        try:
+            from .models import DMConversation
+            conv = DMConversation.objects.get(id=conversation_id)
+            return conv.status == 'ACCEPTED'
         except Exception:
             return False
 

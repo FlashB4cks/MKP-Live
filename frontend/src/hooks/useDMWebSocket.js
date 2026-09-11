@@ -7,6 +7,9 @@ export function useDMWebSocket(conversationId, token) {
   const addMessage = useDMStore((state) => state.addMessage);
   const updateMessageReactions = useDMStore((state) => state.updateMessageReactions);
   const setTypingUser = useDMStore((state) => state.setTypingUser);
+  const handleClearChat = useDMStore((state) => state.handleClearChat);
+  const setConversationStatus = useDMStore((state) => state.setConversationStatus);
+  const handleConversationDeleted = useDMStore((state) => state.handleConversationDeleted);
   const reconnectTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -42,6 +45,12 @@ export function useDMWebSocket(conversationId, token) {
             addMessage(data.message);
           } else if (data.type === 'message_reaction') {
             updateMessageReactions(data.message_id, data.reactions);
+          } else if (data.type === 'clear_chat') {
+            handleClearChat(data.conversation_id);
+          } else if (data.type === 'conversation_status') {
+            setConversationStatus(data.conversation_id, data.status);
+          } else if (data.type === 'conversation_deleted') {
+            handleConversationDeleted(data.conversation_id);
           } else if (data.type === 'typing') {
             setTypingUser(data.username, data.is_typing);
           }

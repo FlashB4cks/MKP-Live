@@ -31,12 +31,17 @@ class DMConversationSerializer(serializers.ModelSerializer):
     other_user = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
+    is_pending = serializers.SerializerMethodField()
+    can_chat = serializers.SerializerMethodField()
+    awaiting_my_acceptance = serializers.SerializerMethodField()
 
     class Meta:
         model = DMConversation
         fields = [
             'id', 'participants', 'other_user', 'last_message',
-            'unread_count', 'created_at', 'updated_at'
+            'unread_count', 'status', 'initiated_by',
+            'is_pending', 'can_chat', 'awaiting_my_acceptance',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
@@ -59,4 +64,16 @@ class DMConversationSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
         return 0
+
+    def get_is_pending(self, obj):
+        return obj.status == 'PENDING'
+
+    def get_can_chat(self, obj):
+        return obj.status == 'ACCEPTED'
+
+    def get_awaiting_my_acceptance(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.status == 'PENDING' and str(obj.initiated_by_id) != str(request.user.id)
+        return False
 

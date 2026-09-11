@@ -1,17 +1,35 @@
-import React from 'react';
-import { Crown, Shield, MessageSquare, X, Users } from 'lucide-react';
+import React, { useState } from 'react';
+import { Crown, Shield, MessageSquare, X, Users, Settings, UserMinus } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useAuthStore } from '../../store/authStore';
 import { useDMStore } from '../../store/dmStore';
+import ManageMemberModal from '../modals/ManageMemberModal';
+import ConfirmModal from '../modals/ConfirmModal';
 
 export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }) {
   const members = useServerStore((state) => state.members);
+  const activeServer = useServerStore((state) => state.activeServer);
+  const kickMember = useServerStore((state) => state.kickMember);
   const setDMView = useServerStore((state) => state.setDMView);
   const currentUser = useAuthStore((state) => state.user);
   const startDirectMessage = useDMStore((state) => state.startDirectMessage);
 
+  const [selectedMemberForManage, setSelectedMemberForManage] = useState(null);
+  const [selectedMemberForKick, setSelectedMemberForKick] = useState(null);
+  const [kickLoading, setKickLoading] = useState(false);
+
   // If not visible on desktop and not open on mobile, don't render
   if (!isVisible && !isOpenMobile) return null;
+
+  const myPerms = activeServer?.my_permissions || {};
+  const isServerOwner = activeServer?.owner?.id === currentUser?.id;
+  const canManageMembers =
+    isServerOwner ||
+    myPerms.is_admin_or_owner ||
+    myPerms.can_manage_members ||
+    myPerms.role === 'ADMIN' ||
+    myPerms.role === 'OWNER';
+  const canManageRoles = isServerOwner || myPerms.is_admin_or_owner || myPerms.role === 'ADMIN';
 
   const onlineMembers = members.filter((m) => m.user.is_online);
   const offlineMembers = members.filter((m) => !m.user.is_online);
@@ -77,6 +95,7 @@ export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }
             {/* Quick DM Button on Hover */}
             {!isMe && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleStartDM(member.user);
@@ -85,6 +104,36 @@ export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }
                 title={`Enviar mensaje directo a @${member.user.username}`}
               >
                 <MessageSquare className="w-3.5 h-3.5 text-discord-blurple" />
+              </button>
+            )}
+
+            {/* Moderation: Manage Permissions & Roles button */}
+            {!isMe && !isOwner && canManageRoles && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedMemberForManage(member);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 text-discord-text-muted hover:text-white hover:bg-discord-active rounded transition"
+                title={`Gestionar permisos de @${member.user.username}`}
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            {/* Moderation: Kick Member button */}
+            {!isMe && !isOwner && canManageMembers && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedMemberForKick(member);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 text-discord-text-muted hover:text-discord-red hover:bg-discord-active rounded transition"
+                title={`Expulsar a @${member.user.username}`}
+              >
+                <UserMinus className="w-3.5 h-3.5" />
               </button>
             )}
 
@@ -162,6 +211,34 @@ export default function MemberSidebar({ isVisible, isOpenMobile, onCloseMobile }
           </div>
         )}
       </aside>
+
+      {/* Member Management Modal */}
+      <ManageMemberModal
+        isOpen={!!selectedMemberForManage}
+        onClose={() => setSelectedMemberForManage(null)}
+        member={selectedMemberForManage}
+        serverId={activeServer?.id}
+        isOwner={isServerOwner}
+      />
+
+      {/* Member Kick Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!selectedMemberForKick}
+        onClose={() => setSelectedMemberForKick(null)}
+        onConfirm={async () => {
+          if (selectedMemberForKick && activeServer) {
+            setKickLoading(true);
+            await kickMember(activeServer.id, selectedMemberForKick.id);
+            setKickLoading(false);
+            setSelectedMemberForKick(null);
+          }
+        }}
+        loading={kickLoading}
+        title="Expulsar miembro"
+        message={`¿Estás seguro de que deseas expulsar a @${selectedMemberForKick?.user.username} del servidor "${activeServer?.name}"?`}
+        confirmText="Expulsar Miembro"
+        danger={true}
+      />
     </>
   );
 }

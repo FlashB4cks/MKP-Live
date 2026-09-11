@@ -34,12 +34,14 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
   const activeConversation = useDMStore((state) => state.activeConversation);
   const fetchConversations = useDMStore((state) => state.fetchConversations);
   const selectConversation = useDMStore((state) => state.selectConversation);
+  const deleteConversation = useDMStore((state) => state.deleteConversation);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [createChannelOpen, setCreateChannelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteServerOpen, setDeleteServerOpen] = useState(false);
   const [channelToDelete, setChannelToDelete] = useState(null);
+  const [conversationToDelete, setConversationToDelete] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [startDMOpen, setStartDMOpen] = useState(false);
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
@@ -165,15 +167,8 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
               <MessageSquare className="w-4 h-4 text-discord-blurple" />
               <span>Mensajes Directos</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <button
-                onClick={() => setStartDMOpen(true)}
-                className="p-1 hover:text-white text-discord-text-muted hover:bg-discord-hover rounded transition"
-                title="Iniciar nuevo mensaje directo"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-              {onCloseMobile && (
+            {onCloseMobile && (
+              <div className="flex items-center space-x-1">
                 <button
                   onClick={onCloseMobile}
                   className="md:hidden p-1 text-discord-text-muted hover:text-white rounded transition"
@@ -181,8 +176,8 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
                 >
                   <X className="w-4 h-4" />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -245,15 +240,6 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
             </div>
           ) : (
             <div>
-              {/* Button to start DM */}
-              <button
-                onClick={() => setStartDMOpen(true)}
-                className="w-full flex items-center space-x-2 px-2.5 py-2 rounded-lg text-xs font-semibold text-discord-text hover:bg-discord-hover hover:text-white transition mb-2 bg-discord-sidebar/40"
-              >
-                <Plus className="w-4 h-4 text-discord-blurple" />
-                <span>Nuevo mensaje directo</span>
-              </button>
-
               {/* Section Header */}
               <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-discord-text-muted tracking-wider uppercase">
                 <span>Mensajes Directos</span>
@@ -324,11 +310,23 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
                           </div>
                         </div>
 
-                        {conv.unread_count > 0 && (
-                          <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
-                            {conv.unread_count}
-                          </span>
-                        )}
+                        <div className="flex items-center space-x-1">
+                          {conv.unread_count > 0 && (
+                            <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                              {conv.unread_count}
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConversationToDelete(conv);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-discord-red text-discord-text-muted transition rounded"
+                            title="Eliminar conversación"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     );
                   })
@@ -400,6 +398,21 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
       <AccountSettingsModal
         isOpen={accountSettingsOpen}
         onClose={() => setAccountSettingsOpen(false)}
+      />
+
+      <ConfirmModal
+        isOpen={!!conversationToDelete}
+        onClose={() => setConversationToDelete(null)}
+        onConfirm={async () => {
+          if (conversationToDelete) {
+            await deleteConversation(conversationToDelete.id);
+            setConversationToDelete(null);
+          }
+        }}
+        title="Eliminar conversación"
+        message="¿Estás seguro de que deseas eliminar esta conversación y todos sus mensajes? Esta acción no se puede deshacer."
+        confirmText="Eliminar Conversación"
+        danger={true}
       />
 
       {activeServer && (

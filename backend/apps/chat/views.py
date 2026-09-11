@@ -92,8 +92,11 @@ class DMConversationListView(APIView):
             serializer = DMConversationSerializer(existing_conv, context={'request': request})
             return Response(serializer.data)
 
-        # Create new conversation
-        conv = DMConversation.objects.create()
+        # Create new conversation with PENDING status and initiated_by
+        conv = DMConversation.objects.create(
+            status='PENDING',
+            initiated_by=request.user
+        )
         conv.participants.add(request.user, target_user)
         serializer = DMConversationSerializer(conv, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -117,6 +120,13 @@ class DirectMessageListView(APIView):
         conv = get_object_or_404(DMConversation, id=conversation_id)
         if not conv.participants.filter(id=request.user.id).exists():
             raise permissions.exceptions.PermissionDenied("No tienes permiso para enviar mensajes a esta conversación.")
+
+        # Ensure conversation is accepted before allowing messages
+        if conv.status != 'ACCEPTED':
+            return Response(
+                {'detail': 'Debes esperar a que el usuario acepte tu solicitud de contacto para chatear.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         content = request.data.get('content', '').strip()
         if not content:
@@ -152,12 +162,18 @@ class UserSearchView(APIView):
 
     def get(self, request):
         query = request.query_params.get('q', '').strip()
-        users = User.objects.exclude(id=request.user.id)
-        if query:
-            users = users.filter(
-                Q(username__icontains=query) | Q(email__icontains=query)
-            )
-        serializer = UserSerializer(users[:30], many=True, context={'request': request})
+        # Ocultar directorio global: no listar usuarios si la búsqueda está vacía o es muy corta
+        if len(query) < 2:
+            return Response([])
+
+        clean_q = query.lstrip('@').strip()
+        if not clean_q:
+            return Response([])
+
+        users = User.objects.exclude(id=request.user.id).filter(
+            username__icontains=clean_q
+        )[:20]
+        serializer = UserSerializer(users, many=True, context={'request': request})
         return Response(serializer.data)
 
 
@@ -261,7 +277,7 @@ class MessageReactionToggleView(APIView):
             return Response({'detail': 'Emoji requerido.'}, status=status.HTTP_400_BAD_REQUEST)
 
         channel_layer = get_channel_layer()
-        user_id = request.user.id
+        user_id = str(request.user.id)
 
         if is_dm:
             msg = get_object_or_404(DirectMessage, id=message_id)
@@ -269,7 +285,7 @@ class MessageReactionToggleView(APIView):
                 raise permissions.exceptions.PermissionDenied("No tienes permiso en este mensaje.")
 
             reactions = dict(msg.reactions or {})
-            users = reactions.get(emoji, [])
+            users = [str(u) for u in reactions.get(emoji, [])]
             if user_id in users:
                 users.remove(user_id)
                 if not users:
@@ -277,7 +293,8 @@ class MessageReactionToggleView(APIView):
                 else:
                     reactions[emoji] = users
             else:
-                reactions.setdefault(emoji, []).append(user_id)
+                users.append(user_id)
+                reactions[emoji] = users
 
             msg.reactions = reactions
             msg.save(update_fields=['reactions'])
@@ -305,7 +322,7 @@ class MessageReactionToggleView(APIView):
                 raise permissions.exceptions.PermissionDenied("No tienes permiso en este mensaje.")
 
             reactions = dict(msg.reactions or {})
-            users = reactions.get(emoji, [])
+            users = [str(u) for u in reactions.get(emoji, [])]
             if user_id in users:
                 users.remove(user_id)
                 if not users:
@@ -313,7 +330,8 @@ class MessageReactionToggleView(APIView):
                 else:
                     reactions[emoji] = users
             else:
-                reactions.setdefault(emoji, []).append(user_id)
+                users.append(user_id)
+                reactions[emoji] = users
 
             msg.reactions = reactions
             msg.save(update_fields=['reactions'])
@@ -333,4 +351,146 @@ class MessageReactionToggleView(APIView):
                     pass
 
             return Response({'status': 'ok', 'message_id': msg.id, 'reactions': msg.reactions})
+
+
+class DirectMessageAcceptView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, conversation_id):
+        conv = get_object_or_404(DMConversation, id=conversation_id)
+        if not conv.participants.filter(id=request.user.id).exists():
+            raise permissions.exceptions.PermissionDenied("No eres participante de esta conversación.")
+
+        # Only the recipient can accept
+        if conv.initiated_by_id and str(conv.initiated_by_id) == str(request.user.id):
+            return Response({'detail': 'No puedes aceptar tu propia solicitud.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        conv.status = 'ACCEPTED'
+        conv.save(update_fields=['status', 'updated_at'])
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"dm_{conversation_id}",
+                    {
+                        'type': 'dm_status_broadcast',
+                        'status': 'ACCEPTED',
+                    }
+                )
+            except Exception:
+                pass
+
+        serializer = DMConversationSerializer(conv, context={'request': request})
+        return Response(serializer.data)
+
+
+class DirectMessageRejectView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, conversation_id):
+        conv = get_object_or_404(DMConversation, id=conversation_id)
+        if not conv.participants.filter(id=request.user.id).exists():
+            raise permissions.exceptions.PermissionDenied("No eres participante de esta conversación.")
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"dm_{conversation_id}",
+                    {
+                        'type': 'dm_status_broadcast',
+                        'status': 'REJECTED',
+                    }
+                )
+            except Exception:
+                pass
+
+        conv.delete()
+        return Response({'status': 'ok', 'detail': 'Solicitud rechazada.'})
+
+
+class DirectMessageClearView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, conversation_id):
+        conv = get_object_or_404(DMConversation, id=conversation_id)
+        if not conv.participants.filter(id=request.user.id).exists():
+            raise permissions.exceptions.PermissionDenied("No eres participante de esta conversación.")
+
+        conv.messages.all().delete()
+        conv.save(update_fields=['updated_at'])
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"dm_{conversation_id}",
+                    {
+                        'type': 'dm_clear_broadcast',
+                        'conversation_id': str(conversation_id),
+                    }
+                )
+            except Exception:
+                pass
+
+        return Response({'status': 'ok', 'detail': 'Historial vaciado exitosamente.'})
+
+
+class DirectMessageDeleteView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, conversation_id):
+        conv = get_object_or_404(DMConversation, id=conversation_id)
+        if not conv.participants.filter(id=request.user.id).exists():
+            raise permissions.exceptions.PermissionDenied("No eres participante de esta conversación.")
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"dm_{conversation_id}",
+                    {
+                        'type': 'dm_deleted_broadcast',
+                        'conversation_id': str(conversation_id),
+                    }
+                )
+            except Exception:
+                pass
+
+        conv.delete()
+        return Response({'status': 'ok', 'detail': 'Conversación eliminada.'})
+
+
+class MessageDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk):
+        msg = get_object_or_404(Message, pk=pk)
+        member = ServerMember.objects.filter(server=msg.channel.server, user=request.user).first()
+
+        is_author = msg.author_id == request.user.id
+        can_moderate = member and member.has_manage_messages_permission()
+
+        if not (is_author or can_moderate):
+            raise permissions.exceptions.PermissionDenied("No tienes permisos para eliminar este mensaje.")
+
+        channel_id = msg.channel.id
+        message_id = msg.id
+        msg.delete()
+
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"chat_{channel_id}",
+                    {
+                        'type': 'message_deleted_broadcast',
+                        'message_id': message_id,
+                    }
+                )
+            except Exception:
+                pass
+
+        return Response({'status': 'ok', 'message_id': message_id})
 

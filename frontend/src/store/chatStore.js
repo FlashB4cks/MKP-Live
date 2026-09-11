@@ -31,8 +31,30 @@ export const useChatStore = create((set, get) => ({
   updateMessageReactions: (messageId, reactions) => {
     set(state => ({
       messages: state.messages.map(m =>
-        m.id === messageId ? { ...m, reactions } : m
+        String(m.id) === String(messageId) ? { ...m, reactions } : m
       ),
+    }));
+  },
+
+  deleteMessage: async (messageId) => {
+    try {
+      await api.delete(`/chat/messages/${messageId}/`);
+      set(state => ({
+        messages: state.messages.filter(m => String(m.id) !== String(messageId))
+      }));
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting message', err);
+      return {
+        success: false,
+        error: err.response?.data?.detail || 'Error al eliminar mensaje'
+      };
+    }
+  },
+
+  removeMessageById: (messageId) => {
+    set(state => ({
+      messages: state.messages.filter(m => String(m.id) !== String(messageId))
     }));
   },
 

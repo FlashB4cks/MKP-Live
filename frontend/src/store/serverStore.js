@@ -184,4 +184,30 @@ export const useServerStore = create((set, get) => ({
       }),
     }));
   },
+
+  kickMember: async (serverId, memberId) => {
+    try {
+      await api.delete(`/servers/${serverId}/members/${memberId}/`);
+      set(state => ({
+        members: state.members.filter(m => m.id !== memberId),
+      }));
+      return { success: true };
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || 'Error al expulsar miembro';
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  updateMemberPermissions: async (serverId, memberId, data) => {
+    try {
+      const res = await api.patch(`/servers/${serverId}/members/${memberId}/`, data);
+      set(state => ({
+        members: state.members.map(m => m.id === memberId ? res.data : m),
+      }));
+      return { success: true, member: res.data };
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || 'Error al actualizar permisos';
+      return { success: false, error: errorMsg };
+    }
+  },
 }));

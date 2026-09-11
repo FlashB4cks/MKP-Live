@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Video, Calendar, Clock, Plus, ShieldCheck, Play, Zap, Trash2, Users, Bell } from 'lucide-react';
+import { Video, Calendar, Clock, Plus, ShieldCheck, Play, Zap, Trash2, Users, Bell, ChevronDown } from 'lucide-react';
 import { useSessionStore } from '../../store/sessionStore';
 import { useAuthStore } from '../../store/authStore';
 import ScheduleSessionModal from './ScheduleSessionModal';
@@ -21,6 +21,17 @@ export default function SessionBanner({ serverId }) {
   const [waitingSession, setWaitingSession] = useState(null);
   const [loadingAction, setLoadingAction] = useState(false);
   const [sessionToCancel, setSessionToCancel] = useState(null);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('session_banner_collapsed') === 'true';
+  });
+
+  const toggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('session_banner_collapsed', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (serverId) {
@@ -33,7 +44,8 @@ export default function SessionBanner({ serverId }) {
   }, [serverId, fetchSessions]);
 
   // Instant 1-Click Meeting
-  const handleInstantMeeting = async () => {
+  const handleInstantMeeting = async (e) => {
+    if (e) e.stopPropagation();
     setLoadingAction(true);
     const res = await startInstantSession(serverId);
     setLoadingAction(false);
@@ -86,45 +98,78 @@ export default function SessionBanner({ serverId }) {
   if (!serverId) return null;
 
   return (
-    <div className="bg-discord-sidebar/90 border-b border-black/30 px-4 py-3 flex-shrink-0">
-      {/* Header Bar with Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center space-x-2.5">
-          <div className="p-2 rounded-lg bg-discord-blurple/20 text-discord-blurple shadow-inner">
+    <div className="bg-discord-sidebar/90 border-b border-black/30 flex-shrink-0 transition-all duration-200">
+      {/* Header Bar with Action Buttons & Collapsible Toggle */}
+      <div
+        onClick={toggleCollapse}
+        className="px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-white/[0.02] select-none"
+      >
+        <div className="flex items-center space-x-2.5 min-w-0">
+          <div className="p-1.5 rounded-lg bg-discord-blurple/20 text-discord-blurple shadow-inner flex-shrink-0">
             <Video className="w-4 h-4" />
           </div>
-          <div>
-            <span className="text-xs font-bold text-white uppercase tracking-wider block">
-              Sesiones Virtuales Seguras (VPN)
-            </span>
-            <span className="text-[10px] text-discord-text-muted">
-              Videoconferencias con cámara, micrófono y sala de espera
-            </span>
+          <div className="min-w-0">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-white uppercase tracking-wider block truncate">
+                Sesiones Virtuales Seguras (VPN)
+              </span>
+              {activeSessions.length > 0 && (
+                <span className="flex items-center space-x-1 bg-discord-green/20 border border-discord-green/50 text-discord-green text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-discord-green inline-block"></span>
+                  <span>{activeSessions.length} en vivo</span>
+                </span>
+              )}
+            </div>
+            {!isCollapsed && (
+              <span className="text-[10px] text-discord-text-muted hidden sm:block truncate">
+                Videoconferencias con cámara, micrófono y sala de espera
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Action Buttons: Instant Meeting & Schedule */}
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={handleInstantMeeting}
-            disabled={loadingAction}
-            className="flex items-center space-x-1.5 text-xs font-bold text-white bg-discord-green hover:bg-discord-green/90 px-3 py-1.5 rounded-md transition shadow disabled:opacity-50"
-            title="Iniciar inmediatamente una reunión en vivo"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span>Iniciar ahora</span>
-          </button>
+        {/* Action Buttons: Instant Meeting & Schedule + Collapse Toggle */}
+        <div className="flex items-center space-x-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {!isCollapsed && (
+            <>
+              <button
+                onClick={handleInstantMeeting}
+                disabled={loadingAction}
+                className="flex items-center space-x-1.5 text-xs font-bold text-white bg-discord-green hover:bg-discord-green/90 px-3 py-1 rounded-md transition shadow disabled:opacity-50"
+                title="Iniciar inmediatamente una reunión en vivo"
+              >
+                <Zap className="w-3.5 h-3.5 fill-current" />
+                <span className="hidden sm:inline">Iniciar ahora</span>
+              </button>
+
+              <button
+                onClick={() => setIsScheduleOpen(true)}
+                className="flex items-center space-x-1 text-xs font-semibold text-discord-blurple hover:text-white bg-discord-blurple/15 hover:bg-discord-blurple px-3 py-1 rounded-md transition"
+                title="Programar para una fecha futura"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Programar</span>
+              </button>
+            </>
+          )}
 
           <button
-            onClick={() => setIsScheduleOpen(true)}
-            className="flex items-center space-x-1 text-xs font-semibold text-discord-blurple hover:text-white bg-discord-blurple/15 hover:bg-discord-blurple px-3 py-1.5 rounded-md transition"
-            title="Programar para una fecha futura"
+            onClick={toggleCollapse}
+            className="p-1.5 text-discord-text-muted hover:text-white hover:bg-white/10 rounded transition"
+            title={isCollapsed ? 'Desplegar panel de sesiones' : 'Colapsar panel de sesiones'}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Programar</span>
+            <ChevronDown
+              className={`w-4 h-4 transition-transform duration-200 ${
+                isCollapsed ? '-rotate-90' : 'rotate-0'
+              }`}
+            />
           </button>
         </div>
       </div>
+
+      {/* Collapsible Content Area */}
+      {!isCollapsed && (
+        <div className="px-4 pb-3 pt-0 border-t border-white/5 mt-1">
 
       {/* List of Sessions */}
       {activeSessions.length > 0 || scheduledSessions.length > 0 ? (
@@ -242,6 +287,8 @@ export default function SessionBanner({ serverId }) {
         <div className="mt-2 text-[11px] text-discord-text-muted flex items-center justify-between bg-discord-chat/40 p-2 rounded-lg border border-white/5">
           <span>No hay sesiones activas en este servidor.</span>
           <span className="text-discord-text-muted/60">Haz clic en "Iniciar ahora" para comenzar una reunión.</span>
+        </div>
+      )}
         </div>
       )}
 

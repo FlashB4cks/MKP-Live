@@ -9,6 +9,7 @@ import {
   Search,
   X,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useChatStore } from '../../store/chatStore';
@@ -18,6 +19,7 @@ import SessionBanner from '../sessions/SessionBanner';
 import VoiceRecorder from './VoiceRecorder';
 import MessageAttachment from './MessageAttachment';
 import MessageReactions, { ReactionBar } from './MessageReactions';
+import ConfirmModal from '../modals/ConfirmModal';
 import api from '../../api/client';
 
 export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav }) {
@@ -30,11 +32,22 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
   const fetchMessages = useChatStore((state) => state.fetchMessages);
   const typingUsers = useChatStore((state) => state.typingUsers);
   const updateMessageReactions = useChatStore((state) => state.updateMessageReactions);
+  const deleteMessage = useChatStore((state) => state.deleteMessage);
 
   const [inputText, setInputText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState(null);
+
+  const myPerms = activeServer?.my_permissions || {};
+  const isOwner = activeServer?.owner?.id === currentUser?.id;
+  const canManageMessages =
+    isOwner ||
+    myPerms.is_admin_or_owner ||
+    myPerms.can_manage_messages ||
+    myPerms.role === 'ADMIN' ||
+    myPerms.role === 'OWNER';
 
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -318,6 +331,8 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
               prevMsg &&
               prevMsg.author?.id === msg.author?.id &&
               new Date(msg.created_at) - new Date(prevMsg.created_at) < 5 * 60 * 1000;
+            const canDeleteThisMessage =
+              msg.author?.id === currentUser?.id || canManageMessages;
 
             return (
               <div
@@ -326,9 +341,19 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
                   isSameAuthorSameMinute ? 'mt-0.5' : 'mt-3'
                 }`}
               >
-                {/* Floating Emoji Quick Reaction Bar on Hover */}
-                <div className="absolute right-4 -top-3 z-10 hidden group-hover:flex items-center">
+                {/* Floating Quick Action Bar on Hover */}
+                <div className="absolute right-4 -top-3.5 z-10 hidden group-hover:flex items-center space-x-0.5 bg-discord-sidebar/95 border border-white/10 rounded-lg p-0.5 shadow-lg backdrop-blur-sm">
                   <ReactionBar onSelectEmoji={(emoji) => handleToggleReaction(msg.id, emoji)} />
+                  {canDeleteThisMessage && (
+                    <button
+                      type="button"
+                      onClick={() => setMessageToDelete(msg)}
+                      className="p-1.5 hover:text-discord-red text-discord-text-muted hover:bg-white/10 rounded transition"
+                      title="Eliminar mensaje"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 {!isSameAuthorSameMinute ? (
@@ -432,6 +457,21 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
           </button>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={!!messageToDelete}
+        onClose={() => setMessageToDelete(null)}
+        onConfirm={async () => {
+          if (messageToDelete) {
+            await deleteMessage(messageToDelete.id);
+            setMessageToDelete(null);
+          }
+        }}
+        title="Eliminar mensaje"
+        message="¿Estás seguro de que deseas eliminar este mensaje? Esta acción no se puede deshacer."
+        confirmText="Eliminar Mensaje"
+        danger={true}
+      />
     </main>
   );
 }

@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X, MessageSquare, Loader2, User } from 'lucide-react';
+import { Search, X, MessageSquare, Loader2, User, UserPlus, Clock } from 'lucide-react';
 import api from '../../api/client';
 import { useDMStore } from '../../store/dmStore';
+import { useAuthStore } from '../../store/authStore';
 
 export default function StartDMModal({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const startDirectMessage = useDMStore((state) => state.startDirectMessage);
+  const selectConversation = useDMStore((state) => state.selectConversation);
+  const conversations = useDMStore((state) => state.conversations);
+  const currentUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -26,10 +30,17 @@ export default function StartDMModal({ isOpen, onClose }) {
       return;
     }
 
+    const query = searchTerm.trim().replace(/^@/, '');
+    if (query.length < 2) {
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
+
     const fetchUsers = async () => {
       setLoading(true);
       try {
-        const res = await api.get(`/chat/users/${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`);
+        const res = await api.get(`/chat/users/?q=${encodeURIComponent(query)}`);
         setUsers(res.data);
       } catch (err) {
         console.error('Error searching users', err);
@@ -38,13 +49,27 @@ export default function StartDMModal({ isOpen, onClose }) {
       }
     };
 
-    const debounce = setTimeout(fetchUsers, 250);
+    const debounce = setTimeout(fetchUsers, 300);
     return () => clearTimeout(debounce);
   }, [isOpen, searchTerm]);
 
-  const handleSelectUser = async (targetUserId) => {
-    await startDirectMessage(targetUserId);
-    onClose();
+  const handleSelectUser = async (targetUser) => {
+    // Check if conversation already exists
+    const existing = conversations.find((c) =>
+      c.participants?.some((p) => String(p.id) === String(targetUser.id)) ||
+      String(c.other_user?.id) === String(targetUser.id)
+    );
+
+    if (existing) {
+      await selectConversation(existing);
+      onClose();
+      return;
+    }
+
+    const res = await startDirectMessage(targetUser.id);
+    if (res.success) {
+      onClose();
+    }
   };
 
   if (!isOpen) return null;
@@ -86,7 +111,7 @@ export default function StartDMModal({ isOpen, onClose }) {
               autoFocus
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nombre de usuario..."
+              placeholder="Buscar por @nombre de usuario..."
               className="w-full bg-discord-input text-white text-xs pl-9 pr-3 py-2.5 rounded-lg border border-transparent focus:border-discord-blurple focus:outline-none transition placeholder-discord-text-muted"
             />
           </div>
@@ -94,61 +119,97 @@ export default function StartDMModal({ isOpen, onClose }) {
 
         {/* Users List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {loading ? (
+          {searchTerm.trim().length < 2 ? (
+            <div className="py-10 text-center text-discord-text-muted text-xs space-y-2">
+              <Search className="w-8 h-8 text-discord-text-muted/40 mx-auto" />
+              <p className="font-medium text-white/80">Escribe el @nombre del usuario</p>
+              <p className="text-[11px] text-discord-text-muted/70 max-w-xs mx-auto">
+                Para proteger la privacidad, introduce al menos 2 letras para encontrar a la persona.
+              </p>
+            </div>
+          ) : loading ? (
             <div className="py-8 flex flex-col items-center justify-center text-discord-text-muted space-y-2">
               <Loader2 className="w-6 h-6 animate-spin text-discord-blurple" />
               <span className="text-xs">Buscando usuarios...</span>
             </div>
           ) : users.length === 0 ? (
             <div className="py-8 text-center text-discord-text-muted text-xs">
-              No se encontraron usuarios disponibles.
+              No se encontraron usuarios que coincidan con "@{searchTerm.trim()}".
             </div>
           ) : (
-            users.map((targetUser) => (
-              <div
-                key={targetUser.id}
-                onClick={() => handleSelectUser(targetUser.id)}
-                className="flex items-center justify-between p-2.5 rounded-xl hover:bg-discord-hover transition cursor-pointer group"
-              >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-9 h-9 rounded-full bg-discord-blurple flex items-center justify-center text-sm font-bold text-white">
-                      {targetUser.avatar_url ? (
-                        <img
-                          src={targetUser.avatar_url}
-                          alt={targetUser.username}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        targetUser.username?.[0]?.toUpperCase()
+            users.map((targetUser) => {
+              const existingConv = conversations.find(
+                (c) =>
+                  c.participants?.some((p) => String(p.id) === String(targetUser.id)) ||
+                  String(c.other_user?.id) === String(targetUser.id)
+              );
+              const isAccepted = existingConv?.status === 'ACCEPTED';
+              const isPending = existingConv?.status === 'PENDING';
+
+              return (
+                <div
+                  key={targetUser.id}
+                  onClick={() => handleSelectUser(targetUser)}
+                  className="flex items-center justify-between p-2.5 rounded-xl hover:bg-discord-hover transition cursor-pointer group"
+                >
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="relative flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-discord-blurple flex items-center justify-center text-sm font-bold text-white">
+                        {targetUser.avatar_url ? (
+                          <img
+                            src={targetUser.avatar_url}
+                            alt={targetUser.username}
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          targetUser.username?.[0]?.toUpperCase()
+                        )}
+                      </div>
+                      {targetUser.is_online && (
+                        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-chat" />
                       )}
                     </div>
-                    {targetUser.is_online && (
-                      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-discord-green rounded-full border-2 border-discord-chat" />
+
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block truncate">
+                        @{targetUser.username}
+                      </span>
+                      <span className="text-[10px] text-discord-text-muted truncate block">
+                        {targetUser.status_text || (targetUser.is_online ? 'En línea' : 'Desconectado')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectUser(targetUser);
+                    }}
+                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition shadow-sm flex items-center space-x-1.5 ${
+                      isAccepted
+                        ? 'bg-discord-blurple text-white hover:bg-discord-blurple-hover'
+                        : isPending
+                        ? 'bg-discord-yellow/20 text-discord-yellow hover:bg-discord-yellow/30'
+                        : 'bg-discord-green text-white hover:bg-discord-green/90'
+                    }`}
+                  >
+                    {isAccepted ? (
+                      <span>Abrir chat</span>
+                    ) : isPending ? (
+                      <>
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Pendiente</span>
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>Enviar solicitud</span>
+                      </>
                     )}
-                  </div>
-
-                  <div className="min-w-0">
-                    <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block truncate">
-                      @{targetUser.username}
-                    </span>
-                    <span className="text-[10px] text-discord-text-muted truncate block">
-                      {targetUser.status_text || (targetUser.is_online ? 'En línea' : 'Desconectado')}
-                    </span>
-                  </div>
+                  </button>
                 </div>
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectUser(targetUser.id);
-                  }}
-                  className="px-3 py-1.5 rounded-md bg-discord-blurple text-white text-xs font-semibold hover:bg-discord-blurple-hover transition shadow-sm"
-                >
-                  Mensaje
-                </button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

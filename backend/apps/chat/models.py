@@ -48,6 +48,22 @@ class DMConversation(models.Model):
         settings.AUTH_USER_MODEL,
         related_name='dm_conversations'
     )
+    status = models.CharField(
+        max_length=20,
+        default='ACCEPTED',
+        choices=[
+            ('PENDING', 'Pending'),
+            ('ACCEPTED', 'Accepted'),
+            ('REJECTED', 'Rejected'),
+        ]
+    )
+    initiated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='initiated_dm_conversations'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

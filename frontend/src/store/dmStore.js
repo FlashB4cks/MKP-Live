@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from '../api/client';
 import { useServerStore } from './serverStore';
+import { useAuthStore } from './authStore';
 
 export const useDMStore = create((set, get) => ({
   conversations: [],
@@ -26,7 +27,28 @@ export const useDMStore = create((set, get) => ({
     if (!conversation?.id) return;
     try {
       const res = await api.get(`/chat/dms/${conversation.id}/messages/`);
-      set({ messages: res.data, loading: false });
+      set((state) => {
+        // Only apply if the user hasn't switched to another conversation
+        if (state.activeConversation?.id !== conversation.id) return state;
+
+        // Merge incoming messages with any optimistic/in-flight messages
+        const msgMap = new Map();
+        res.data.forEach((m) => msgMap.set(String(m.id), m));
+
+        // Preserve any optimistic messages or messages that arrived while request was in-flight
+        state.messages.forEach((m) => {
+          const key = String(m.id);
+          if (!msgMap.has(key)) {
+            msgMap.set(key, m);
+          }
+        });
+
+        const sorted = Array.from(msgMap.values()).sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        );
+
+        return { messages: sorted, loading: false };
+      });
     } catch (err) {
       console.error('Error fetching DM messages', err);
       set({ loading: false });
@@ -71,28 +93,49 @@ export const useDMStore = create((set, get) => ({
 
   addMessage: (message) => {
     set((state) => {
-      if (state.messages.some((m) => m.id === message.id)) {
+      // If message already exists by real id, ignore
+      if (state.messages.some((m) => String(m.id) === String(message.id))) {
         return state;
       }
+
+      // Check if there's a matching optimistic message to replace
+      const optimisticIndex = state.messages.findIndex(
+        (m) =>
+          m.is_optimistic &&
+          m.content === message.content &&
+          String(m.sender?.id) === String(message.sender?.id)
+      );
+
+      let updatedMessages;
+      if (optimisticIndex !== -1) {
+        updatedMessages = [...state.messages];
+        updatedMessages[optimisticIndex] = message;
+      } else {
+        updatedMessages = [...state.messages, message];
+      }
+
       // Also update last message in conversation list
       const updatedConversations = state.conversations.map((conv) => {
-        if (conv.id === message.conversation || (state.activeConversation && conv.id === state.activeConversation.id)) {
+        if (
+          conv.id === message.conversation ||
+          (state.activeConversation && conv.id === state.activeConversation.id)
+        ) {
           return { ...conv, last_message: message, updated_at: message.created_at };
         }
         return conv;
       });
 
       return {
-        messages: [...state.messages, message],
+        messages: updatedMessages,
         conversations: updatedConversations,
       };
     });
   },
 
   updateMessageReactions: (messageId, reactions) => {
-    set(state => ({
-      messages: state.messages.map(m =>
-        m.id === messageId ? { ...m, reactions } : m
+    set((state) => ({
+      messages: state.messages.map((m) =>
+        String(m.id) === String(messageId) ? { ...m, reactions } : m
       ),
     }));
   },
@@ -101,21 +144,168 @@ export const useDMStore = create((set, get) => ({
     const activeConv = get().activeConversation;
     if (!activeConv?.id || !content.trim()) return;
 
+    const text = content.trim();
+    const currentUser = useAuthStore.getState().user;
+    const tempId = `temp-${Date.now()}`;
+
+    // Optimistic UI update: instantly render message in UI
+    const optimisticMsg = {
+      id: tempId,
+      conversation: activeConv.id,
+      sender: currentUser,
+      content: text,
+      reactions: {},
+      created_at: new Date().toISOString(),
+      is_optimistic: true,
+    };
+
+    set((state) => ({
+      messages: [...state.messages, optimisticMsg],
+    }));
+
     try {
-      const res = await api.post(`/chat/dms/${activeConv.id}/messages/`, { content: content.trim() });
+      const res = await api.post(`/chat/dms/${activeConv.id}/messages/`, { content: text });
       const newMsg = res.data;
-      get().addMessage(newMsg);
+
+      // Replace optimistic message with actual persisted message
+      set((state) => ({
+        messages: state.messages.map((m) => (m.id === tempId ? newMsg : m)),
+      }));
+
       return { success: true, message: newMsg };
     } catch (err) {
       console.error('Error sending DM', err);
-      return { success: false, error: 'Error al enviar mensaje' };
+      // Remove optimistic message on failure
+      set((state) => ({
+        messages: state.messages.filter((m) => m.id !== tempId),
+      }));
+      const errorMsg = err.response?.data?.detail || 'Error al enviar mensaje';
+      return { success: false, error: errorMsg };
     }
+  },
+
+  acceptDMRequest: async (conversationId) => {
+    try {
+      const res = await api.post(`/chat/dms/${conversationId}/accept/`);
+      const updatedConv = res.data;
+      set((state) => ({
+        conversations: state.conversations.map((c) => (c.id === conversationId ? updatedConv : c)),
+        activeConversation:
+          state.activeConversation?.id === conversationId ? updatedConv : state.activeConversation,
+      }));
+      return { success: true, conversation: updatedConv };
+    } catch (err) {
+      console.error('Error accepting DM request', err);
+      return {
+        success: false,
+        error: err.response?.data?.detail || 'Error al aceptar solicitud',
+      };
+    }
+  },
+
+  rejectDMRequest: async (conversationId) => {
+    try {
+      await api.post(`/chat/dms/${conversationId}/reject/`);
+      set((state) => ({
+        conversations: state.conversations.filter((c) => c.id !== conversationId),
+        activeConversation:
+          state.activeConversation?.id === conversationId ? null : state.activeConversation,
+        messages: state.activeConversation?.id === conversationId ? [] : state.messages,
+      }));
+      return { success: true };
+    } catch (err) {
+      console.error('Error rejecting DM request', err);
+      return {
+        success: false,
+        error: err.response?.data?.detail || 'Error al rechazar solicitud',
+      };
+    }
+  },
+
+  clearConversationMessages: async (conversationId) => {
+    try {
+      await api.post(`/chat/dms/${conversationId}/clear/`);
+      set((state) => ({
+        messages: state.activeConversation?.id === conversationId ? [] : state.messages,
+        conversations: state.conversations.map((c) =>
+          c.id === conversationId ? { ...c, last_message: null } : c
+        ),
+      }));
+      return { success: true };
+    } catch (err) {
+      console.error('Error clearing conversation', err);
+      return {
+        success: false,
+        error: err.response?.data?.detail || 'Error al vaciar conversación',
+      };
+    }
+  },
+
+  deleteConversation: async (conversationId) => {
+    try {
+      await api.delete(`/chat/dms/${conversationId}/delete/`);
+      set((state) => ({
+        conversations: state.conversations.filter((c) => c.id !== conversationId),
+        activeConversation:
+          state.activeConversation?.id === conversationId ? null : state.activeConversation,
+        messages: state.activeConversation?.id === conversationId ? [] : state.messages,
+      }));
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting conversation', err);
+      return {
+        success: false,
+        error: err.response?.data?.detail || 'Error al eliminar conversación',
+      };
+    }
+  },
+
+  setConversationStatus: (conversationId, status) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conversationId
+          ? {
+              ...c,
+              status,
+              is_pending: status === 'PENDING',
+              can_chat: status === 'ACCEPTED',
+            }
+          : c
+      ),
+      activeConversation:
+        state.activeConversation?.id === conversationId
+          ? {
+              ...state.activeConversation,
+              status,
+              is_pending: status === 'PENDING',
+              can_chat: status === 'ACCEPTED',
+            }
+          : state.activeConversation,
+    }));
   },
 
   setTypingUser: (username, isTyping) => {
     set({
       typingUser: isTyping ? username : null,
     });
+  },
+
+  handleClearChat: (conversationId) => {
+    set((state) => ({
+      messages: state.activeConversation?.id === conversationId ? [] : state.messages,
+      conversations: state.conversations.map((c) =>
+        c.id === conversationId ? { ...c, last_message: null } : c
+      ),
+    }));
+  },
+
+  handleConversationDeleted: (conversationId) => {
+    set((state) => ({
+      conversations: state.conversations.filter((c) => c.id !== conversationId),
+      activeConversation:
+        state.activeConversation?.id === conversationId ? null : state.activeConversation,
+      messages: state.activeConversation?.id === conversationId ? [] : state.messages,
+    }));
   },
 
   clearActiveConversation: () => {

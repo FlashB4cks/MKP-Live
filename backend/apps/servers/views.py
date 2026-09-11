@@ -75,6 +75,29 @@ class ServerMemberDetailView(generics.RetrieveUpdateDestroyAPIView):
         server_id = self.kwargs['server_id']
         return ServerMember.objects.filter(server_id=server_id)
 
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        current_member = ServerMember.objects.filter(
+            server=instance.server,
+            user=self.request.user
+        ).first()
+
+        if not current_member or not current_member.is_admin_or_owner():
+            raise permissions.exceptions.PermissionDenied(
+                "Solo administradores o el dueño pueden modificar roles y permisos de miembros."
+            )
+
+        # Cannot edit owner
+        if instance.role == RoleChoices.OWNER and instance.user != self.request.user:
+            raise permissions.exceptions.PermissionDenied("No se pueden modificar los permisos del dueño.")
+
+        # Only owner can promote someone to ADMIN or change an ADMIN
+        new_role = self.request.data.get('role')
+        if (new_role == RoleChoices.ADMIN or instance.role == RoleChoices.ADMIN) and current_member.role != RoleChoices.OWNER:
+            raise permissions.exceptions.PermissionDenied("Solo el dueño del servidor puede gestionar el rol de Administrador.")
+
+        serializer.save()
+
     def perform_destroy(self, instance):
         current_member = ServerMember.objects.filter(
             server=instance.server,
@@ -90,13 +113,15 @@ class ServerMemberDetailView(generics.RetrieveUpdateDestroyAPIView):
             instance.delete()
             return
 
-        # Admins or Owners can kick members
-        if not current_member or current_member.role not in [RoleChoices.OWNER, RoleChoices.ADMIN]:
+        # Users with manage_members permission can kick members
+        if not current_member or not current_member.has_manage_members_permission():
             raise permissions.exceptions.PermissionDenied(
                 "No tienes permisos para expulsar miembros."
             )
         if instance.role == RoleChoices.OWNER:
-            raise permissions.exceptions.PermissionDenied("No se puede expulsar al dueño.")
+            raise permissions.exceptions.PermissionDenied("No se puede expulsar al dueño del servidor.")
+        if instance.role == RoleChoices.ADMIN and current_member.role != RoleChoices.OWNER:
+            raise permissions.exceptions.PermissionDenied("Solo el dueño puede expulsar a un administrador.")
 
         instance.delete()
 
