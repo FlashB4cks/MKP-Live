@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, MessageSquare, Loader2, User } from 'lucide-react';
 import api from '../../api/client';
 import { useDMStore } from '../../store/dmStore';
@@ -8,6 +9,15 @@ export default function StartDMModal({ isOpen, onClose }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const startDirectMessage = useDMStore((state) => state.startDirectMessage);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -39,9 +49,15 @@ export default function StartDMModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 select-none backdrop-blur-sm">
-      <div className="relative w-full max-w-md rounded-2xl bg-discord-chat shadow-2xl border border-white/10 flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 select-none backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl bg-discord-chat shadow-2xl border border-white/10 flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-4 border-b border-black/20 flex items-center justify-between bg-discord-sidebar">
           <div>
@@ -136,6 +152,7 @@ export default function StartDMModal({ isOpen, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   User,
@@ -77,6 +78,18 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       setDeletePassword('');
     }
   }, [user, isOpen]);
+
+  // Close on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !user) return null;
 
@@ -189,17 +202,30 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       })
     : 'Desconocido';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-2xl bg-discord-chat border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] sm:max-h-[85vh]"
+        className="w-full max-w-3xl bg-discord-chat border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[92vh] sm:max-h-[85vh] relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Left Sidebar Tabs (Desktop) / Top Tabs (Mobile) */}
         <div className="w-full md:w-56 bg-discord-sidebar/95 border-b md:border-b-0 md:border-r border-white/10 p-3 sm:p-4 flex flex-row md:flex-col justify-between flex-shrink-0">
           <div className="space-y-1 w-full flex md:flex-col overflow-x-auto md:overflow-visible gap-1 md:gap-1.5 pb-1 md:pb-0">
-            <div className="hidden md:block px-2 pb-2 text-[11px] font-bold text-discord-text-muted tracking-wider uppercase">
-              Ajustes de Usuario
+            <div className="flex items-center justify-between px-2 pb-2">
+              <span className="text-[11px] font-bold text-discord-text-muted tracking-wider uppercase">
+                Ajustes de Usuario
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="md:hidden p-1 rounded-lg text-discord-text-muted hover:text-white hover:bg-white/10 transition"
+                title="Cerrar ajustes"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <button
@@ -251,8 +277,19 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
             </button>
           </div>
 
-          <div className="hidden md:block pt-4 border-t border-white/10 mt-auto">
+          <div className="hidden md:flex flex-col gap-1.5 pt-4 border-t border-white/10 mt-auto">
             <button
+              type="button"
+              onClick={onClose}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-discord-text-muted hover:text-white hover:bg-white/5 transition"
+              title="Cerrar ajustes (Esc)"
+            >
+              <X className="w-4 h-4" />
+              <span>Cerrar Ajustes</span>
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-white/10 font-mono text-gray-300">ESC</span>
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 onClose();
                 logout();
@@ -276,10 +313,14 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               {activeTab === 'danger' && 'Eliminar Cuenta'}
             </h3>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1 rounded-lg text-discord-text-muted hover:text-white hover:bg-white/10 transition"
-              title="Cerrar ajustes"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-discord-text-muted hover:text-white hover:bg-white/10 border border-white/10 hover:border-white/20 transition group"
+              title="Cerrar ajustes (Esc)"
             >
+              <span className="text-[11px] font-mono font-medium hidden sm:inline text-discord-text-muted group-hover:text-white">
+                ESC
+              </span>
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -632,6 +673,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

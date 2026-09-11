@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Hash } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 
@@ -9,6 +10,15 @@ export default function CreateChannelModal({ isOpen, onClose, serverId }) {
   const [error, setError] = useState(null);
 
   const createChannel = useServerStore((state) => state.createChannel);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !loading) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, loading]);
 
   if (!isOpen) return null;
 
@@ -32,9 +42,17 @@ export default function CreateChannelModal({ isOpen, onClose, serverId }) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="relative w-full max-w-md rounded-lg bg-discord-chat p-6 shadow-2xl">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+      onClick={() => {
+        if (!loading) onClose();
+      }}
+    >
+      <div
+        className="relative w-full max-w-md rounded-lg bg-discord-chat p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-discord-text-muted hover:text-white transition"
@@ -106,6 +124,7 @@ export default function CreateChannelModal({ isOpen, onClose, serverId }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

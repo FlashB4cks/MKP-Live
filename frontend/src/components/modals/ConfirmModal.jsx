@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, AlertTriangle } from 'lucide-react';
 
 export default function ConfirmModal({
@@ -11,11 +12,28 @@ export default function ConfirmModal({
   loading = false,
   danger = true,
 }) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !loading) onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, loading]);
+
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="relative w-full max-w-md rounded-2xl bg-discord-chat p-6 shadow-2xl border border-white/10">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in"
+      onClick={() => {
+        if (!loading) onClose();
+      }}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl bg-discord-chat p-6 shadow-2xl border border-white/10"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           disabled={loading}
@@ -60,6 +78,7 @@ export default function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -55,7 +55,7 @@ export default function MainLayout() {
       {/* Left Navigation: Server Bar + Channel Bar */}
       {/* On desktop (md+): flex layout. On mobile: fixed slide-over drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 flex md:static md:z-auto h-full flex-shrink-0 transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-50 flex md:static md:z-auto h-full flex-shrink-0 transition-transform duration-300 ease-in-out md:transform-none ${
           mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >

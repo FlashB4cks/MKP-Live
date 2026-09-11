@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Copy, Check } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 
@@ -7,6 +8,15 @@ export default function InviteModal({ isOpen, onClose, server }) {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const createInvite = useServerStore((state) => state.createInvite);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen && server) {
@@ -30,9 +40,15 @@ export default function InviteModal({ isOpen, onClose, server }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="relative w-full max-w-md rounded-lg bg-discord-chat p-6 shadow-2xl">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-md rounded-lg bg-discord-chat p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute right-4 top-4 text-discord-text-muted hover:text-white transition"
@@ -94,6 +110,7 @@ export default function InviteModal({ isOpen, onClose, server }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
