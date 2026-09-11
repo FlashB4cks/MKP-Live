@@ -26,10 +26,10 @@ export default function LoginPage({ onSwitchToRegister }) {
             <MessageSquare className="w-8 h-8" />
           </div>
           <h1 className="text-2xl font-bold text-white text-center">
-            ¡Te damos la bienvenida a MKP Live!
+            ¡Te damos la bienvenida de nuevo!
           </h1>
           <p className="text-sm text-discord-text-muted mt-1 text-center">
-            Conéctate y chatea en tiempo real con tus comunidades
+            ¡Nos alegra verte de nuevo!
           </p>
         </div>
 
@@ -42,34 +42,22 @@ export default function LoginPage({ onSwitchToRegister }) {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-2">
-              Usuario o Correo electrónico *
+              Correo electrónico o nombre de usuario *
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Tu usuario o correo"
+              placeholder="Tu correo o usuario"
               required
               className="w-full rounded bg-discord-sidebar p-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-discord-blurple"
             />
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted">
-                Contraseña *
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setRecoveryInitialTab('password');
-                  setRecoveryModalOpen(true);
-                }}
-                className="text-xs text-discord-blurple hover:underline font-medium"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
-            </div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-2">
+              Contraseña *
+            </label>
             <input
               type="password"
               value={password}
@@ -79,16 +67,28 @@ export default function LoginPage({ onSwitchToRegister }) {
               className="w-full rounded bg-discord-sidebar p-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-discord-blurple"
             />
 
-            <div className="flex justify-end pt-1.5">
+            {/* Recovery links side by side */}
+            <div className="flex items-center space-x-2 pt-2 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoveryInitialTab('password');
+                  setRecoveryModalOpen(true);
+                }}
+                className="text-discord-blurple hover:underline font-medium"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+              <span className="text-discord-text-muted/40">•</span>
               <button
                 type="button"
                 onClick={() => {
                   setRecoveryInitialTab('username');
                   setRecoveryModalOpen(true);
                 }}
-                className="text-[11px] text-discord-text-muted hover:text-white transition underline"
+                className="text-discord-blurple hover:underline font-medium"
               >
-                ¿Olvidaste tu nombre de usuario?
+                ¿Olvidaste tu usuario?
               </button>
             </div>
           </div>
