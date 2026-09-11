@@ -126,8 +126,8 @@ export default function ManageMemberModal({ isOpen, onClose, member, serverId, i
                 disabled={loading || !isOwner}
                 className="w-full bg-discord-input text-white text-xs px-3 py-2 rounded-lg border border-white/10 focus:border-discord-blurple focus:outline-none transition disabled:opacity-60"
               >
-                <option value="MEMBER">Miembro (Standard)</option>
-                <option value="ADMIN">Administrador (ADMIN)</option>
+                <option value="MEMBER">Miembro</option>
+                <option value="ADMIN">Administrador</option>
               </select>
               {!isOwner && (
                 <span className="text-[10px] text-discord-text-muted mt-1 block">
@@ -158,7 +158,7 @@ export default function ManageMemberModal({ isOpen, onClose, member, serverId, i
                 />
                 <div>
                   <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block">
-                    Gestionar Mensajes (MANAGE_MESSAGES)
+                    Gestionar Mensajes
                   </span>
                   <span className="text-[11px] text-discord-text-muted block">
                     Permite eliminar mensajes de cualquier usuario en todos los canales de este servidor.
@@ -176,7 +176,7 @@ export default function ManageMemberModal({ isOpen, onClose, member, serverId, i
                 />
                 <div>
                   <span className="text-xs font-semibold text-white group-hover:text-discord-blurple transition block">
-                    Gestionar Miembros (MANAGE_MEMBERS)
+                    Gestionar Miembros
                   </span>
                   <span className="text-[11px] text-discord-text-muted block">
                     Permite expulsar miembros del servidor.
