@@ -38,7 +38,11 @@ export default function ServerSidebar({ onSelectDM }) {
           }`}
           title="MKP Live - Mensajes Directos"
         >
-          <MessageSquare className="w-6 h-6" />
+          <img
+            src="/logo-icon.png"
+            alt="MKP Live"
+            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform duration-200"
+          />
         </button>
       </div>
 

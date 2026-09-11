@@ -10,6 +10,12 @@
   "theme_color": "#2f3136",
   "icons": [
     {
+      "src": "/logo-icon.png",
+      "sizes": "224x224",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
       "src": "/icon.svg",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",

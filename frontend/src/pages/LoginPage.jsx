@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { MessageSquare } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import AccountRecoveryModal from '../components/modals/AccountRecoveryModal';
 
@@ -19,99 +18,115 @@ export default function LoginPage({ onSwitchToRegister }) {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#1e1f22] p-4">
-      <div className="w-full max-w-[480px] bg-discord-chat rounded-lg p-8 shadow-2xl border border-black/20">
-        <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 rounded-2xl bg-discord-blurple flex items-center justify-center text-white mb-4 shadow-lg">
-            <MessageSquare className="w-8 h-8" />
-          </div>
-          <h1 className="text-2xl font-bold text-white text-center">
-            ¡Te damos la bienvenida de nuevo!
-          </h1>
-          <p className="text-sm text-discord-text-muted mt-1 text-center">
-            ¡Nos alegra verte de nuevo!
-          </p>
+    <div
+      className="min-h-screen w-full flex items-center justify-center p-4 relative bg-[#1a1d36] bg-cover bg-center bg-no-repeat overflow-y-auto select-none"
+      style={{ backgroundImage: "url('/login-bg.svg')" }}
+    >
+      {/* Subtle dark backdrop overlay for depth and contrast */}
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+
+      <div className="relative z-10 w-full max-w-[480px] flex flex-col items-center my-6">
+        {/* New Brand Logo at Top */}
+        <div className="mb-6 flex items-center justify-center">
+          <img
+            src="/logo.png"
+            alt="MKP Live"
+            className="h-10 sm:h-12 w-auto object-contain drop-shadow-xl"
+          />
         </div>
 
-        {error && (
-          <div className="mb-4 rounded bg-discord-red/20 p-3 text-sm text-discord-red border border-discord-red/30">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-2">
-              Correo electrónico o nombre de usuario *
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Tu correo o usuario"
-              required
-              className="w-full rounded bg-discord-sidebar p-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-discord-blurple"
-            />
+        {/* Floating Login Card */}
+        <div className="w-full bg-[#313338] rounded-xl p-6 sm:p-8 shadow-2xl border border-black/20 backdrop-blur-sm select-text">
+          <div className="text-center mb-6 select-none">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+              ¡Te damos la bienvenida de nuevo!
+            </h1>
+            <p className="text-xs sm:text-sm text-[#b5bac1] mt-1">
+              ¡Nos alegra verte de nuevo!
+            </p>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-2">
-              Contraseña *
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              className="w-full rounded bg-discord-sidebar p-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-discord-blurple"
-            />
+          {error && (
+            <div className="mb-4 rounded-md bg-discord-red/20 p-3 text-xs text-discord-red border border-discord-red/30">
+              {error}
+            </div>
+          )}
 
-            {/* Recovery links side by side */}
-            <div className="flex items-center space-x-2 pt-2 text-xs">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#b5bac1] mb-2">
+                CORREO ELECTRÓNICO O NOMBRE DE USUARIO <span className="text-[#f23f43]">*</span>
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Tu correo o usuario"
+                required
+                autoFocus
+                className="w-full rounded-md bg-[#1e1f22] px-3.5 py-2.5 text-sm text-white placeholder:text-[#80848e] border border-black/30 focus:border-discord-blurple focus:outline-none transition shadow-inner"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-[#b5bac1] mb-2">
+                CONTRASEÑA <span className="text-[#f23f43]">*</span>
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full rounded-md bg-[#1e1f22] px-3.5 py-2.5 text-sm text-white placeholder:text-[#80848e] border border-black/30 focus:border-discord-blurple focus:outline-none transition shadow-inner"
+              />
+
+              {/* Recovery links side by side */}
+              <div className="flex items-center space-x-1.5 pt-2 text-xs select-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryInitialTab('password');
+                    setRecoveryModalOpen(true);
+                  }}
+                  className="text-[#00a8fc] hover:underline font-medium transition"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+                <span className="text-[#949ba4]">•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecoveryInitialTab('username');
+                    setRecoveryModalOpen(true);
+                  }}
+                  className="text-[#00a8fc] hover:underline font-medium transition"
+                >
+                  ¿Olvidaste tu usuario?
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-md bg-discord-blurple hover:bg-discord-blurple-hover active:bg-[#4752c4] py-2.5 sm:py-3 text-sm font-semibold text-white transition duration-150 disabled:opacity-50 shadow-md mt-2"
+            >
+              {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            </button>
+
+            <div className="text-xs sm:text-sm text-[#949ba4] text-left sm:text-center pt-2 select-none">
+              ¿Necesitas una cuenta?{' '}
               <button
                 type="button"
-                onClick={() => {
-                  setRecoveryInitialTab('password');
-                  setRecoveryModalOpen(true);
-                }}
-                className="text-discord-blurple hover:underline font-medium"
+                onClick={onSwitchToRegister}
+                className="text-[#00a8fc] hover:underline font-medium transition"
               >
-                ¿Olvidaste tu contraseña?
-              </button>
-              <span className="text-discord-text-muted/40">•</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setRecoveryInitialTab('username');
-                  setRecoveryModalOpen(true);
-                }}
-                className="text-discord-blurple hover:underline font-medium"
-              >
-                ¿Olvidaste tu usuario?
+                Registrarse
               </button>
             </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded bg-discord-blurple py-2.5 text-sm font-semibold text-white hover:bg-discord-blurple-hover transition duration-200 disabled:opacity-50 shadow-md"
-          >
-            {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
-          </button>
-
-          <div className="text-sm text-discord-text-muted text-center pt-2">
-            ¿Necesitas una cuenta?{' '}
-            <button
-              type="button"
-              onClick={onSwitchToRegister}
-              className="text-discord-blurple hover:underline font-medium"
-            >
-              Registrarse
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
       <AccountRecoveryModal
