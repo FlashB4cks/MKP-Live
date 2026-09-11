@@ -10,6 +10,8 @@ import {
   Trash2,
   MessageSquare,
   X,
+  UserCheck,
+  Users,
 } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
 import { useAuthStore } from '../../store/authStore';
@@ -32,6 +34,8 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
   const isDMView = useServerStore((state) => state.isDMView);
   const conversations = useDMStore((state) => state.conversations);
   const activeConversation = useDMStore((state) => state.activeConversation);
+  const viewMode = useDMStore((state) => state.viewMode);
+  const openRequestsView = useDMStore((state) => state.openRequestsView);
   const fetchConversations = useDMStore((state) => state.fetchConversations);
   const selectConversation = useDMStore((state) => state.selectConversation);
   const deleteConversation = useDMStore((state) => state.deleteConversation);
@@ -48,10 +52,22 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
 
   const dropdownRef = useRef(null);
 
-  // Fetch DM conversations when in DM view or on mount
+  // Compute incoming pending requests
+  const pendingIncomingCount = conversations.filter(
+    (c) =>
+      c.status === 'PENDING' &&
+      (c.awaiting_my_acceptance ||
+        (c.initiated_by && String(c.initiated_by) !== String(user?.id)))
+  ).length;
+
+  // Fetch DM conversations when in DM view or on mount, with background refresh
   useEffect(() => {
     if (!activeServer || isDMView) {
       fetchConversations();
+      const interval = setInterval(() => {
+        fetchConversations();
+      }, 10000);
+      return () => clearInterval(interval);
     }
   }, [activeServer, isDMView, fetchConversations]);
 
@@ -240,12 +256,37 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
             </div>
           ) : (
             <div>
+              {/* Solicitudes de contacto / amigos prominent button */}
+              <div className="px-2 mb-2">
+                <button
+                  onClick={() => {
+                    openRequestsView();
+                    onChannelSelect?.();
+                  }}
+                  className={`w-full group flex items-center justify-between px-2.5 py-2 rounded-lg text-sm font-semibold transition cursor-pointer ${
+                    viewMode === 'requests' && !activeConversation
+                      ? 'bg-discord-active text-white'
+                      : 'text-discord-text hover:bg-discord-hover hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2.5">
+                    <UserCheck className="w-4 h-4 text-discord-blurple group-hover:scale-110 transition-transform" />
+                    <span>Solicitudes</span>
+                  </div>
+                  {pendingIncomingCount > 0 && (
+                    <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow animate-pulse">
+                      {pendingIncomingCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+
               {/* Section Header */}
               <div className="flex items-center justify-between px-2 py-1 text-[11px] font-bold text-discord-text-muted tracking-wider uppercase">
                 <span>Mensajes Directos</span>
                 <button
                   onClick={() => setStartDMOpen(true)}
-                  className="hover:text-white transition"
+                  className="hover:text-white transition p-0.5 rounded hover:bg-white/5"
                   title="Nuevo mensaje directo"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -267,7 +308,12 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
                 ) : (
                   conversations.map((conv) => {
                     const partner = conv.other_user || conv.participants?.find((p) => p.id !== user?.id);
-                    const isActive = activeConversation?.id === conv.id;
+                    const isActive = activeConversation?.id === conv.id && viewMode === 'chat';
+                    const isPending = conv.status === 'PENDING';
+                    const isIncoming =
+                      isPending &&
+                      (conv.awaiting_my_acceptance ||
+                        (conv.initiated_by && String(conv.initiated_by) !== String(user?.id)));
 
                     return (
                       <div
@@ -301,18 +347,31 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
                           </div>
 
                           <div className="min-w-0">
-                            <div className="truncate text-xs font-semibold leading-tight">
-                              @{partner?.username || 'Usuario'}
+                            <div className="flex items-center space-x-1.5">
+                              <span className="truncate text-xs font-semibold leading-tight">
+                                @{partner?.username || 'Usuario'}
+                              </span>
+                              {isPending && (
+                                <span
+                                  className={`text-[9px] px-1 py-0.2 rounded font-semibold flex-shrink-0 ${
+                                    isIncoming
+                                      ? 'bg-discord-yellow/20 text-discord-yellow'
+                                      : 'bg-white/10 text-discord-text-muted'
+                                  }`}
+                                >
+                                  {isIncoming ? 'Solicitud' : 'Pendiente'}
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-discord-text-muted truncate leading-tight mt-0.5 max-w-[120px]">
-                              {conv.last_message?.content || partner?.status_text || 'Sin mensajes'}
+                              {conv.last_message?.content || partner?.status_text || (isPending ? 'Solicitud pendiente' : 'Sin mensajes')}
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center space-x-1">
                           {conv.unread_count > 0 && (
-                            <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0">
+                            <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 shadow">
                               {conv.unread_count}
                             </span>
                           )}

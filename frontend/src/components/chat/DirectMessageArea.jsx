@@ -15,6 +15,7 @@ import {
   Check,
   XCircle,
   Clock,
+  UserCheck,
 } from 'lucide-react';
 import { useDMStore } from '../../store/dmStore';
 import { useAuthStore } from '../../store/authStore';
@@ -24,11 +25,14 @@ import ConfirmModal from '../modals/ConfirmModal';
 import VoiceRecorder from './VoiceRecorder';
 import MessageAttachment from './MessageAttachment';
 import MessageReactions, { ReactionBar } from './MessageReactions';
+import ContactRequestsView from './ContactRequestsView';
 import api from '../../api/client';
 
 export default function DirectMessageArea({ onOpenMobileNav }) {
   const activeConversation = useDMStore((state) => state.activeConversation);
   const conversations = useDMStore((state) => state.conversations);
+  const viewMode = useDMStore((state) => state.viewMode);
+  const openRequestsView = useDMStore((state) => state.openRequestsView);
   const messages = useDMStore((state) => state.messages);
   const loading = useDMStore((state) => state.loading);
   const typingUser = useDMStore((state) => state.typingUser);
@@ -123,11 +127,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       clearTimeout(typingTimeoutRef.current);
     }
 
-    if (isConnected) {
-      sendMessage(text);
-    } else {
-      await sendDirectMessage(text);
-    }
+    await sendDirectMessage(text);
   };
 
   const handleKeyDown = (e) => {
@@ -188,8 +188,20 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       )
     : messages;
 
+  // If in requests view mode, render the dedicated Contact Requests view
+  if (viewMode === 'requests') {
+    return <ContactRequestsView onOpenMobileNav={onOpenMobileNav} />;
+  }
+
   // If no conversation is selected, render the DM Home View
   if (!activeConversation) {
+    const pendingIncomingCount = conversations.filter(
+      (c) =>
+        c.status === 'PENDING' &&
+        (c.awaiting_my_acceptance ||
+          (c.initiated_by && String(c.initiated_by) !== String(currentUser?.id)))
+    ).length;
+
     return (
       <main className="flex-1 bg-discord-chat flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none">
         {onOpenMobileNav && (
@@ -208,16 +220,31 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
           Mensajes Directos en MKP Live
         </h2>
         <p className="text-xs sm:text-sm text-discord-text-muted max-w-md mb-6 leading-relaxed">
-          Comunícate en privado y en tiempo real con cualquier usuario registrado. Busca a un compañero o continúa una conversación pendiente.
+          Comunícate en privado y en tiempo real con cualquier usuario registrado. Busca a un compañero, gestiona tus solicitudes o continúa una conversación.
         </p>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Iniciar nuevo mensaje directo</span>
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={openRequestsView}
+            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-sidebar hover:bg-discord-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2 border border-white/10"
+          >
+            <UserCheck className="w-4 h-4 text-discord-blurple" />
+            <span>Solicitudes de contacto</span>
+            {pendingIncomingCount > 0 && (
+              <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full ml-1">
+                {pendingIncomingCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Iniciar nuevo mensaje directo</span>
+          </button>
+        </div>
 
         {/* Recent DM list preview */}
         {conversations.length > 0 && (

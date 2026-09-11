@@ -4,6 +4,7 @@ from accounts.serializers import UserSerializer
 
 class MessageSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
+    channel = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -14,8 +15,12 @@ class MessageSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'author', 'is_edited', 'created_at', 'updated_at']
 
+    def get_channel(self, obj):
+        return str(obj.channel_id)
+
 class DirectMessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+    conversation = serializers.SerializerMethodField()
 
     class Meta:
         model = DirectMessage
@@ -25,6 +30,9 @@ class DirectMessageSerializer(serializers.ModelSerializer):
             'is_read', 'created_at'
         ]
         read_only_fields = ['id', 'sender', 'is_read', 'created_at']
+
+    def get_conversation(self, obj):
+        return str(obj.conversation_id)
 
 class DMConversationSerializer(serializers.ModelSerializer):
     participants = UserSerializer(many=True, read_only=True)

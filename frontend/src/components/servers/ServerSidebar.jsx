@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Compass, MessageSquare } from 'lucide-react';
 import { useServerStore } from '../../store/serverStore';
+import { useDMStore } from '../../store/dmStore';
+import { useAuthStore } from '../../store/authStore';
 import CreateServerModal from '../modals/CreateServerModal';
 import JoinServerModal from '../modals/JoinServerModal';
 
@@ -10,11 +12,22 @@ export default function ServerSidebar({ onSelectDM }) {
   const selectServer = useServerStore((state) => state.selectServer);
   const setDMView = useServerStore((state) => state.setDMView);
   const isDMView = useServerStore((state) => state.isDMView);
+  const conversations = useDMStore((state) => state.conversations);
+  const user = useAuthStore((state) => state.user);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
 
   const isDMsActive = !activeServer || isDMView;
+
+  const totalUnread = conversations.reduce((acc, c) => acc + (c.unread_count || 0), 0);
+  const pendingIncoming = conversations.filter(
+    (c) =>
+      c.status === 'PENDING' &&
+      (c.awaiting_my_acceptance ||
+        (c.initiated_by && String(c.initiated_by) !== String(user?.id)))
+  ).length;
+  const totalNotifications = totalUnread + pendingIncoming;
 
   return (
     <aside className="w-[72px] flex-shrink-0 bg-discord-sidebar flex flex-col items-center py-3 space-y-2 select-none z-20">
@@ -26,24 +39,31 @@ export default function ServerSidebar({ onSelectDM }) {
             isDMsActive ? 'h-10' : 'h-0 group-hover:h-5'
           }`}
         />
-        <button
-          onClick={() => {
-            setDMView();
-            onSelectDM?.();
-          }}
-          className={`w-12 h-12 rounded-[24px] group-hover:rounded-[16px] flex items-center justify-center transition-all duration-200 ${
-            isDMsActive
-              ? 'bg-discord-blurple rounded-[16px] text-white'
-              : 'bg-discord-chat hover:bg-discord-blurple text-discord-text hover:text-white'
-          }`}
-          title="MKP Live - Mensajes Directos"
-        >
-          <img
-            src="/logo-icon.png"
-            alt="MKP Live"
-            className="w-7 h-7 object-contain group-hover:scale-110 transition-transform duration-200"
-          />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => {
+              setDMView();
+              onSelectDM?.();
+            }}
+            className={`w-12 h-12 rounded-[24px] group-hover:rounded-[16px] flex items-center justify-center transition-all duration-200 ${
+              isDMsActive
+                ? 'bg-discord-blurple rounded-[16px] text-white shadow-lg'
+                : 'bg-discord-chat hover:bg-discord-blurple text-discord-text hover:text-white'
+            }`}
+            title="MKP Live - Mensajes Directos y Solicitudes"
+          >
+            <img
+              src="/logo-icon.png"
+              alt="MKP Live"
+              className="w-7 h-7 object-contain group-hover:scale-110 transition-transform duration-200"
+            />
+          </button>
+          {totalNotifications > 0 && (
+            <span className="absolute -top-1 -right-1 bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full border-2 border-discord-sidebar shadow z-10 animate-pulse">
+              {totalNotifications}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Separator */}

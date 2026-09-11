@@ -375,6 +375,7 @@ class DirectMessageAcceptView(APIView):
                     f"dm_{conversation_id}",
                     {
                         'type': 'dm_status_broadcast',
+                        'conversation_id': str(conversation_id),
                         'status': 'ACCEPTED',
                     }
                 )
@@ -400,6 +401,7 @@ class DirectMessageRejectView(APIView):
                     f"dm_{conversation_id}",
                     {
                         'type': 'dm_status_broadcast',
+                        'conversation_id': str(conversation_id),
                         'status': 'REJECTED',
                     }
                 )

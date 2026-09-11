@@ -6,9 +6,21 @@ import { useAuthStore } from './authStore';
 export const useDMStore = create((set, get) => ({
   conversations: [],
   activeConversation: null,
+  viewMode: 'chat', // 'chat' | 'requests'
   messages: [],
   loading: false,
   typingUser: null,
+
+  setViewMode: (mode) =>
+    set({
+      viewMode: mode,
+      activeConversation: mode === 'requests' ? null : get().activeConversation,
+    }),
+
+  openRequestsView: () => {
+    useServerStore.getState().setDMView();
+    set({ activeConversation: null, viewMode: 'requests', messages: [], typingUser: null });
+  },
 
   fetchConversations: async () => {
     try {
@@ -23,7 +35,17 @@ export const useDMStore = create((set, get) => ({
 
   selectConversation: async (conversation) => {
     useServerStore.getState().setDMView();
-    set({ activeConversation: conversation, messages: [], loading: true, typingUser: null });
+    // Immediately clear unread_count for this conversation in UI
+    set((state) => ({
+      activeConversation: conversation ? { ...conversation, unread_count: 0 } : null,
+      viewMode: 'chat',
+      conversations: state.conversations.map((c) =>
+        c.id === conversation?.id ? { ...c, unread_count: 0 } : c
+      ),
+      messages: [],
+      loading: true,
+      typingUser: null,
+    }));
     if (!conversation?.id) return;
     try {
       const res = await api.get(`/chat/dms/${conversation.id}/messages/`);
@@ -47,7 +69,13 @@ export const useDMStore = create((set, get) => ({
           (a, b) => new Date(a.created_at) - new Date(b.created_at)
         );
 
-        return { messages: sorted, loading: false };
+        return {
+          messages: sorted,
+          loading: false,
+          conversations: state.conversations.map((c) =>
+            c.id === conversation.id ? { ...c, unread_count: 0 } : c
+          ),
+        };
       });
     } catch (err) {
       console.error('Error fetching DM messages', err);
@@ -114,13 +142,25 @@ export const useDMStore = create((set, get) => ({
         updatedMessages = [...state.messages, message];
       }
 
-      // Also update last message in conversation list
+      // Also update last message and unread count in conversation list
+      const isActive =
+        state.activeConversation &&
+        (String(state.activeConversation.id) === String(message.conversation) ||
+          String(state.activeConversation.id) === String(message.conversation_id));
+
       const updatedConversations = state.conversations.map((conv) => {
-        if (
-          conv.id === message.conversation ||
-          (state.activeConversation && conv.id === state.activeConversation.id)
-        ) {
-          return { ...conv, last_message: message, updated_at: message.created_at };
+        const matches =
+          String(conv.id) === String(message.conversation) ||
+          String(conv.id) === String(message.conversation_id) ||
+          (isActive && String(conv.id) === String(state.activeConversation.id));
+
+        if (matches) {
+          return {
+            ...conv,
+            last_message: message,
+            updated_at: message.created_at,
+            unread_count: isActive ? 0 : (conv.unread_count || 0) + 1,
+          };
         }
         return conv;
       });
@@ -309,6 +349,6 @@ export const useDMStore = create((set, get) => ({
   },
 
   clearActiveConversation: () => {
-    set({ activeConversation: null, messages: [], typingUser: null });
+    set({ activeConversation: null, messages: [], typingUser: null, viewMode: 'chat' });
   },
 }));

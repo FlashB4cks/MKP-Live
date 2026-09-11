@@ -2,10 +2,14 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
+from django.core.serializers.json import DjangoJSONEncoder
 from channels_app.models import Channel
 from servers.models import ServerMember
 from .models import Message
 from accounts.serializers import UserSerializer
+
+def safe_json_dumps(data):
+    return json.dumps(data, cls=DjangoJSONEncoder)
 
 User = get_user_model()
 
@@ -122,20 +126,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Group Event Handlers
     async def chat_message_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'chat_message',
             'message': event['message'],
         }))
 
     async def reaction_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'message_reaction',
             'message_id': event['message_id'],
             'reactions': event['reactions'],
         }))
 
     async def message_deleted_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'message_deleted',
             'message_id': event['message_id'],
         }))
@@ -143,7 +147,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def typing_broadcast(self, event):
         # Don't send typing to self
         if event.get('user_id') != str(self.user.id):
-            await self.send(text_data=json.dumps({
+            await self.send(text_data=safe_json_dumps({
                 'type': 'typing',
                 'user_id': event['user_id'],
                 'username': event['username'],
@@ -151,7 +155,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
 
     async def presence_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'presence',
             'user_id': event['user_id'],
             'username': event['username'],
@@ -243,7 +247,7 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
                 # Verify that conversation is ACCEPTED before creating message
                 can_chat = await self.check_conversation_accepted(self.conversation_id)
                 if not can_chat:
-                    await self.send(text_data=json.dumps({
+                    await self.send(text_data=safe_json_dumps({
                         'type': 'error',
                         'message': 'La solicitud de contacto aún no ha sido aceptada.',
                     }))
@@ -275,13 +279,13 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
             pass
 
     async def dm_message_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'chat_message',
             'message': event['message'],
         }))
 
     async def reaction_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'message_reaction',
             'message_id': event['message_id'],
             'reactions': event['reactions'],
@@ -289,7 +293,7 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
 
     async def typing_broadcast(self, event):
         if event.get('user_id') != str(self.user.id):
-            await self.send(text_data=json.dumps({
+            await self.send(text_data=safe_json_dumps({
                 'type': 'typing',
                 'user_id': event['user_id'],
                 'username': event['username'],
@@ -297,21 +301,22 @@ class DirectMessageConsumer(AsyncWebsocketConsumer):
             }))
 
     async def dm_clear_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'clear_chat',
-            'conversation_id': event['conversation_id'],
+            'conversation_id': str(event['conversation_id']),
         }))
 
     async def dm_status_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'conversation_status',
+            'conversation_id': str(event.get('conversation_id', self.conversation_id)),
             'status': event['status'],
         }))
 
     async def dm_deleted_broadcast(self, event):
-        await self.send(text_data=json.dumps({
+        await self.send(text_data=safe_json_dumps({
             'type': 'conversation_deleted',
-            'conversation_id': event['conversation_id'],
+            'conversation_id': str(event['conversation_id']),
         }))
 
     @database_sync_to_async
