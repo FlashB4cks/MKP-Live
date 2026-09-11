@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import AccountRecoveryModal from '../components/modals/AccountRecoveryModal';
 
 export default function LoginPage({ onSwitchToRegister }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [recoveryModalOpen, setRecoveryModalOpen] = useState(false);
+  const [recoveryInitialTab, setRecoveryInitialTab] = useState('password');
+
   const login = useAuthStore((state) => state.login);
   const loading = useAuthStore((state) => state.loading);
   const error = useAuthStore((state) => state.error);
@@ -38,28 +42,55 @@ export default function LoginPage({ onSwitchToRegister }) {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-2">
-              Nombre de usuario *
+              Usuario o Correo electrónico *
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              placeholder="Tu usuario o correo"
               required
               className="w-full rounded bg-discord-sidebar p-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-discord-blurple"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-2">
-              Contraseña *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted">
+                Contraseña *
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoveryInitialTab('password');
+                  setRecoveryModalOpen(true);
+                }}
+                className="text-xs text-discord-blurple hover:underline font-medium"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               required
               className="w-full rounded bg-discord-sidebar p-2.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-discord-blurple"
             />
+
+            <div className="flex justify-end pt-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setRecoveryInitialTab('username');
+                  setRecoveryModalOpen(true);
+                }}
+                className="text-[11px] text-discord-text-muted hover:text-white transition underline"
+              >
+                ¿Olvidaste tu nombre de usuario?
+              </button>
+            </div>
           </div>
 
           <button
@@ -82,6 +113,12 @@ export default function LoginPage({ onSwitchToRegister }) {
           </div>
         </form>
       </div>
+
+      <AccountRecoveryModal
+        isOpen={recoveryModalOpen}
+        onClose={() => setRecoveryModalOpen(false)}
+        initialTab={recoveryInitialTab}
+      />
     </div>
   );
 }

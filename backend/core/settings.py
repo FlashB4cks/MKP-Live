@@ -229,3 +229,12 @@ VPN_ALLOWED_SUBNETS = [
 ]
 VPN_REQUIRED_HEADER = os.getenv('VPN_REQUIRED_HEADER', 'X-VPN-Secure-Gateway')
 
+# Email Configuration (Safe console backend fallback for dev, SMTP configurable via env)
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'MKP Live <noreply@mkplive.com>')
+

@@ -1,0 +1,637 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  X,
+  User,
+  Shield,
+  Info,
+  Trash2,
+  Camera,
+  Check,
+  AlertCircle,
+  Copy,
+  CheckCircle2,
+  Lock,
+  Mail,
+  Smile,
+  LogOut,
+} from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
+
+export default function AccountSettingsModal({ isOpen, onClose }) {
+  const user = useAuthStore((state) => state.user);
+  const updateProfile = useAuthStore((state) => state.updateProfile);
+  const changePassword = useAuthStore((state) => state.changePassword);
+  const deleteAccount = useAuthStore((state) => state.deleteAccount);
+  const logout = useAuthStore((state) => state.logout);
+
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile' | 'security' | 'details' | 'danger'
+
+  // Profile Form States
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [bio, setBio] = useState('');
+  const [statusText, setStatusText] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [removeAvatar, setRemoveAvatar] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+  const [profileSuccess, setProfileSuccess] = useState(null);
+  const avatarInputRef = useRef(null);
+
+  // Security Form States
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPassword2, setNewPassword2] = useState('');
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [securityError, setSecurityError] = useState(null);
+  const [securitySuccess, setSecuritySuccess] = useState(null);
+
+  // Danger Zone States
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // Copy UUID
+  const [copiedId, setCopiedId] = useState(false);
+
+  useEffect(() => {
+    if (user && isOpen) {
+      setUsername(user.username || '');
+      setEmail(user.email || '');
+      setBio(user.bio || '');
+      setStatusText(user.status_text || '');
+      setAvatarPreview(user.avatar_url || user.avatar || null);
+      setAvatarFile(null);
+      setRemoveAvatar(false);
+      setProfileError(null);
+      setProfileSuccess(null);
+      setSecurityError(null);
+      setSecuritySuccess(null);
+      setDeleteError(null);
+      setDeleteConfirmOpen(false);
+      setOldPassword('');
+      setNewPassword('');
+      setNewPassword2('');
+      setDeletePassword('');
+    }
+  }, [user, isOpen]);
+
+  if (!isOpen || !user) return null;
+
+  // Handle Avatar file pick
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      setRemoveAvatar(false);
+      const reader = new FileReader();
+      reader.onload = () => setAvatarPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setRemoveAvatar(true);
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+  };
+
+  // Save Profile
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    const formData = new FormData();
+    formData.append('username', username.trim());
+    formData.append('email', email.trim());
+    formData.append('bio', bio);
+    formData.append('status_text', statusText.trim());
+
+    if (avatarFile) {
+      formData.append('avatar', avatarFile);
+    } else if (removeAvatar) {
+      formData.append('remove_avatar', 'true');
+    }
+
+    const res = await updateProfile(formData);
+    setProfileLoading(false);
+
+    if (res.success) {
+      setProfileSuccess('Perfil actualizado exitosamente.');
+      setTimeout(() => setProfileSuccess(null), 3500);
+    } else {
+      setProfileError(res.error);
+    }
+  };
+
+  // Change Password
+  const handleSavePassword = async (e) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword || !newPassword2) return;
+    if (newPassword !== newPassword2) {
+      setSecurityError('Las nuevas contraseñas no coinciden.');
+      return;
+    }
+
+    setSecurityLoading(true);
+    setSecurityError(null);
+    setSecuritySuccess(null);
+
+    const res = await changePassword(oldPassword, newPassword, newPassword2);
+    setSecurityLoading(false);
+
+    if (res.success) {
+      setSecuritySuccess('Contraseña cambiada exitosamente.');
+      setOldPassword('');
+      setNewPassword('');
+      setNewPassword2('');
+      setTimeout(() => setSecuritySuccess(null), 3500);
+    } else {
+      setSecurityError(res.error);
+    }
+  };
+
+  // Delete Account
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    if (!deletePassword) return;
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    const res = await deleteAccount(deletePassword);
+    setDeleteLoading(false);
+
+    if (res.success) {
+      onClose();
+    } else {
+      setDeleteError(res.error);
+    }
+  };
+
+  // Copy User ID
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(user.id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
+
+  const memberSince = user.created_at
+    ? new Date(user.created_at).toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Desconocido';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+      <div
+        className="w-full max-w-2xl bg-discord-chat border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh] sm:max-h-[85vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Left Sidebar Tabs (Desktop) / Top Tabs (Mobile) */}
+        <div className="w-full md:w-56 bg-discord-sidebar/95 border-b md:border-b-0 md:border-r border-white/10 p-3 sm:p-4 flex flex-row md:flex-col justify-between flex-shrink-0">
+          <div className="space-y-1 w-full flex md:flex-col overflow-x-auto md:overflow-visible gap-1 md:gap-1.5 pb-1 md:pb-0">
+            <div className="hidden md:block px-2 pb-2 text-[11px] font-bold text-discord-text-muted tracking-wider uppercase">
+              Ajustes de Usuario
+            </div>
+
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                activeTab === 'profile'
+                  ? 'bg-discord-blurple text-white shadow-sm'
+                  : 'text-discord-text hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>Mi Perfil</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('security')}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                activeTab === 'security'
+                  ? 'bg-discord-blurple text-white shadow-sm'
+                  : 'text-discord-text hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              <span>Seguridad</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('details')}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                activeTab === 'details'
+                  ? 'bg-discord-blurple text-white shadow-sm'
+                  : 'text-discord-text hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Info className="w-4 h-4" />
+              <span>Detalles</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('danger')}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+                activeTab === 'danger'
+                  ? 'bg-discord-red text-white shadow-sm'
+                  : 'text-discord-red/80 hover:bg-discord-red/10 hover:text-discord-red'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Zona de Peligro</span>
+            </button>
+          </div>
+
+          <div className="hidden md:block pt-4 border-t border-white/10 mt-auto">
+            <button
+              onClick={() => {
+                onClose();
+                logout();
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-discord-red hover:bg-discord-red/10 transition"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Cerrar Sesión</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-discord-chat overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-white/10 bg-discord-chat">
+            <h3 className="text-sm sm:text-base font-bold text-white capitalize">
+              {activeTab === 'profile' && 'Editar Perfil'}
+              {activeTab === 'security' && 'Seguridad & Contraseña'}
+              {activeTab === 'details' && 'Información de la Cuenta'}
+              {activeTab === 'danger' && 'Eliminar Cuenta'}
+            </h3>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-discord-text-muted hover:text-white hover:bg-white/10 transition"
+              title="Cerrar ajustes"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Body Scrollable */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+            {/* TAB 1: EDIT PROFILE */}
+            {activeTab === 'profile' && (
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                {profileError && (
+                  <div className="rounded-xl bg-discord-red/20 border border-discord-red/30 p-3 text-xs text-discord-red flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{profileError}</span>
+                  </div>
+                )}
+                {profileSuccess && (
+                  <div className="rounded-xl bg-discord-green/20 border border-discord-green/30 p-3 text-xs text-discord-green flex items-start gap-2">
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{profileSuccess}</span>
+                  </div>
+                )}
+
+                {/* Avatar Section */}
+                <div className="flex items-center space-x-4 pb-2 border-b border-white/5">
+                  <div className="relative group">
+                    <div className="w-20 h-20 rounded-full bg-discord-blurple flex items-center justify-center text-3xl font-bold text-white overflow-hidden shadow-xl border-2 border-white/10">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Avatar preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        username?.[0]?.toUpperCase() || user.username?.[0]?.toUpperCase() || 'U'
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                      title="Cambiar foto de perfil"
+                    >
+                      <Camera className="w-5 h-5 mb-0.5" />
+                      <span className="text-[10px] font-bold">Cambiar</span>
+                    </button>
+
+                    <input
+                      type="file"
+                      ref={avatarInputRef}
+                      onChange={handleAvatarChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-bold text-white">Foto de Perfil</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        className="text-xs bg-white/10 hover:bg-white/15 text-white font-semibold px-3 py-1.5 rounded-lg transition"
+                      >
+                        Subir foto
+                      </button>
+                      {(avatarPreview || user.avatar_url) && (
+                        <button
+                          type="button"
+                          onClick={handleRemoveAvatar}
+                          className="text-xs text-discord-red hover:bg-discord-red/10 px-2.5 py-1.5 rounded-lg transition"
+                        >
+                          Quitar foto
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-discord-text-muted">
+                      JPG, PNG o GIF. Recomendado formato cuadrado.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
+                      Nombre de Usuario *
+                    </label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      required
+                      className="w-full bg-discord-sidebar px-3.5 py-2 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
+                      Correo Electrónico *
+                    </label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full bg-discord-sidebar px-3.5 py-2 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5 flex items-center gap-1.5">
+                    <Smile className="w-3.5 h-3.5" />
+                    <span>Estado Personalizado</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={statusText}
+                    onChange={(e) => setStatusText(e.target.value)}
+                    placeholder="Ej. En el trabajo, programando, etc."
+                    maxLength={120}
+                    className="w-full bg-discord-sidebar px-3.5 py-2 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
+                    Acerca de Mí (Biografía)
+                  </label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Cuéntale un poco sobre ti a tu comunidad..."
+                    className="w-full bg-discord-sidebar p-3 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition resize-none"
+                  />
+                  <span className="text-[10px] text-discord-text-muted block text-right">
+                    {bio.length}/500 caracteres
+                  </span>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={profileLoading || !username.trim() || !email.trim()}
+                    className="bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-lg transition shadow-md flex items-center gap-2"
+                  >
+                    {profileLoading ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 2: SECURITY (CHANGE PASSWORD) */}
+            {activeTab === 'security' && (
+              <form onSubmit={handleSavePassword} className="space-y-4">
+                <p className="text-xs text-discord-text-muted leading-relaxed">
+                  Para mayor seguridad, te recomendamos usar una contraseña única que no utilices en otros servicios.
+                </p>
+
+                {securityError && (
+                  <div className="rounded-xl bg-discord-red/20 border border-discord-red/30 p-3 text-xs text-discord-red flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{securityError}</span>
+                  </div>
+                )}
+                {securitySuccess && (
+                  <div className="rounded-xl bg-discord-green/20 border border-discord-green/30 p-3 text-xs text-discord-green flex items-start gap-2">
+                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{securitySuccess}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
+                    Contraseña Actual *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-discord-text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      required
+                      placeholder="Ingresa tu contraseña actual"
+                      className="w-full bg-discord-sidebar pl-9 pr-3.5 py-2 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
+                    Nueva Contraseña *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-discord-text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      placeholder="Mínimo 8 caracteres"
+                      className="w-full bg-discord-sidebar pl-9 pr-3.5 py-2 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
+                    Confirmar Nueva Contraseña *
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-discord-text-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="password"
+                      value={newPassword2}
+                      onChange={(e) => setNewPassword2(e.target.value)}
+                      required
+                      placeholder="Repite la nueva contraseña"
+                      className="w-full bg-discord-sidebar pl-9 pr-3.5 py-2 rounded-lg text-sm text-white placeholder-discord-text-muted/60 border border-white/10 focus:outline-none focus:border-discord-blurple transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={securityLoading || !oldPassword || !newPassword || !newPassword2}
+                    className="bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-lg transition shadow-md"
+                  >
+                    {securityLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 3: ACCOUNT DETAILS */}
+            {activeTab === 'details' && (
+              <div className="space-y-4 text-xs">
+                <div className="bg-discord-sidebar/80 p-4 rounded-xl border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
+                    <span className="text-discord-text-muted">Nombre de usuario:</span>
+                    <span className="font-bold text-white">@{user.username}</span>
+                  </div>
+                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
+                    <span className="text-discord-text-muted">Correo electrónico:</span>
+                    <span className="font-bold text-white">{user.email}</span>
+                  </div>
+                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
+                    <span className="text-discord-text-muted">Miembro desde:</span>
+                    <span className="font-bold text-white">{memberSince}</span>
+                  </div>
+                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
+                    <span className="text-discord-text-muted">Estado de cuenta:</span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-discord-green/20 text-discord-green font-semibold text-[11px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-discord-green" /> Activa
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-discord-text-muted">ID de Usuario:</span>
+                    <div className="flex items-center gap-1.5 font-mono text-[11px] text-discord-text-muted">
+                      <span>{user.id}</span>
+                      <button
+                        onClick={handleCopyId}
+                        className="p-1 hover:text-white rounded hover:bg-white/10 transition"
+                        title="Copiar ID de usuario"
+                      >
+                        {copiedId ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-discord-green" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: DANGER ZONE */}
+            {activeTab === 'danger' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-discord-red/10 border border-discord-red/30 space-y-2">
+                  <h4 className="text-sm font-bold text-discord-red flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Eliminar Cuenta Permanentemente</span>
+                  </h4>
+                  <p className="text-xs text-discord-text leading-relaxed">
+                    Al eliminar tu cuenta, se borrarán todos tus datos personales, mensajes y configuraciones de forma irreversible. No podrás volver a recuperar el acceso a esta cuenta.
+                  </p>
+                </div>
+
+                {deleteError && (
+                  <div className="rounded-xl bg-discord-red/20 border border-discord-red/30 p-3 text-xs text-discord-red flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{deleteError}</span>
+                  </div>
+                )}
+
+                {!deleteConfirmOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmOpen(true)}
+                    className="bg-discord-red hover:bg-discord-red/90 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition shadow"
+                  >
+                    Deseo eliminar mi cuenta
+                  </button>
+                ) : (
+                  <form onSubmit={handleDeleteAccount} className="space-y-3 pt-2">
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-discord-red mb-1.5">
+                        Ingresa tu contraseña actual para confirmar la eliminación:
+                      </label>
+                      <input
+                        type="password"
+                        value={deletePassword}
+                        onChange={(e) => setDeletePassword(e.target.value)}
+                        required
+                        placeholder="Contraseña actual"
+                        className="w-full bg-discord-sidebar px-3.5 py-2 rounded-lg text-sm text-white border border-discord-red/50 focus:outline-none focus:ring-1 focus:ring-discord-red transition"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="submit"
+                        disabled={deleteLoading || !deletePassword}
+                        className="bg-discord-red hover:bg-discord-red/90 disabled:opacity-50 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition shadow"
+                      >
+                        {deleteLoading ? 'Eliminando cuenta...' : 'Confirmar Eliminación Definitiva'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteConfirmOpen(false);
+                          setDeletePassword('');
+                          setDeleteError(null);
+                        }}
+                        className="text-xs text-discord-text-muted hover:text-white px-3 py-2 rounded transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

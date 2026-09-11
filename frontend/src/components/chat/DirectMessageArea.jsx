@@ -6,7 +6,6 @@ import {
   WifiOff,
   Plus,
   Menu,
-  Paperclip,
   Search,
   X,
   Loader2,
@@ -38,7 +37,6 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
   const [isUploading, setIsUploading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -118,31 +116,6 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       }
     } catch (err) {
       console.error('Error al reaccionar en DM', err);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeConversation?.id) return;
-    setIsUploading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('conversation_id', activeConversation.id);
-      if (inputText.trim()) {
-        formData.append('content', inputText.trim());
-        setInputText('');
-      }
-
-      await api.post('/chat/upload/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-    } catch (err) {
-      console.error('Error al subir archivo en DM', err);
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -527,31 +500,10 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
 
       {/* Message Input Box */}
       <div className="px-2 sm:px-4 pb-16 md:pb-4 flex-shrink-0 select-none">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-
         <form
           onSubmit={handleSendMessage}
           className="bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner"
         >
-          {/* File Attachment Upload Button */}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="text-discord-text-muted hover:text-white transition p-1 rounded-md hover:bg-white/5 disabled:opacity-40"
-            title="Adjuntar archivo o imagen"
-          >
-            {isUploading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-discord-blurple" />
-            ) : (
-              <Paperclip className="w-5 h-5" />
-            )}
-          </button>
 
           <input
             type="text"

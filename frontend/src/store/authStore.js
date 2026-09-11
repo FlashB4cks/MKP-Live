@@ -67,4 +67,103 @@ export const useAuthStore = create((set, get) => ({
       console.error('Failed to fetch profile', err);
     }
   },
+
+  updateProfile: async (payload) => {
+    try {
+      const isFormData = payload instanceof FormData;
+      const res = await api.patch('/auth/me/', payload, {
+        headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {},
+      });
+      localStorage.setItem('user', JSON.stringify(res.data));
+      set({ user: res.data });
+      return { success: true, user: res.data };
+    } catch (err) {
+      let errorMsg = 'Error al actualizar perfil';
+      if (err.response?.data) {
+        const errors = Object.values(err.response.data).flat();
+        errorMsg = errors.join(' ') || errorMsg;
+      }
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  changePassword: async (old_password, new_password, new_password2) => {
+    try {
+      const res = await api.post('/auth/change-password/', {
+        old_password,
+        new_password,
+        new_password2,
+      });
+      return { success: true, detail: res.data?.detail };
+    } catch (err) {
+      let errorMsg = 'Error al cambiar contraseña';
+      if (err.response?.data) {
+        const errors = Object.values(err.response.data).flat();
+        errorMsg = errors.join(' ') || errorMsg;
+      }
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  deleteAccount: async (password) => {
+    try {
+      await api.post('/auth/delete-account/', { password });
+      get().logout();
+      return { success: true };
+    } catch (err) {
+      let errorMsg = 'Error al eliminar cuenta';
+      if (err.response?.data) {
+        const errors = Object.values(err.response.data).flat();
+        errorMsg = errors.join(' ') || errorMsg;
+      }
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  requestPasswordReset: async (email) => {
+    try {
+      const res = await api.post('/auth/password-reset/request/', { email });
+      return { success: true, data: res.data };
+    } catch (err) {
+      let errorMsg = 'Error al solicitar recuperación';
+      if (err.response?.data) {
+        const errors = Object.values(err.response.data).flat();
+        errorMsg = errors.join(' ') || errorMsg;
+      }
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  confirmPasswordReset: async (email, code, new_password, new_password2) => {
+    try {
+      const res = await api.post('/auth/password-reset/confirm/', {
+        email,
+        code,
+        new_password,
+        new_password2,
+      });
+      return { success: true, detail: res.data?.detail };
+    } catch (err) {
+      let errorMsg = 'Error al restablecer contraseña';
+      if (err.response?.data) {
+        const errors = Object.values(err.response.data).flat();
+        errorMsg = errors.join(' ') || errorMsg;
+      }
+      return { success: false, error: errorMsg };
+    }
+  },
+
+  recoverUsername: async (email) => {
+    try {
+      const res = await api.post('/auth/recover-username/', { email });
+      return { success: true, data: res.data };
+    } catch (err) {
+      let errorMsg = 'Error al consultar nombre de usuario';
+      if (err.response?.data) {
+        const errors = Object.values(err.response.data).flat();
+        errorMsg = errors.join(' ') || errorMsg;
+      }
+      return { success: false, error: errorMsg };
+    }
+  },
 }));

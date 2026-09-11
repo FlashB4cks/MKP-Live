@@ -18,6 +18,7 @@ import CreateChannelModal from '../modals/CreateChannelModal';
 import InviteModal from '../modals/InviteModal';
 import ConfirmModal from '../modals/ConfirmModal';
 import StartDMModal from '../modals/StartDMModal';
+import AccountSettingsModal from '../modals/AccountSettingsModal';
 
 export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
   const activeServer = useServerStore((state) => state.activeServer);
@@ -41,6 +42,7 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
   const [channelToDelete, setChannelToDelete] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [startDMOpen, setStartDMOpen] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
 
   const dropdownRef = useRef(null);
 
@@ -339,9 +341,13 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
 
       {/* User Footer Card */}
       <div className="h-[52px] bg-discord-sidebar/60 px-2 flex items-center justify-between">
-        <div className="flex items-center space-x-2 min-w-0">
+        <div
+          onClick={() => setAccountSettingsOpen(true)}
+          className="flex items-center space-x-2 min-w-0 flex-1 p-1 rounded-lg hover:bg-white/5 cursor-pointer transition mr-1"
+          title="Ajustes de mi cuenta"
+        >
           <div className="relative flex-shrink-0">
-            <div className="w-8 h-8 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-xs">
+            <div className="w-8 h-8 rounded-full bg-discord-blurple flex items-center justify-center font-bold text-white text-xs overflow-hidden shadow">
               {user?.avatar_url ? (
                 <img
                   src={user.avatar_url}
@@ -366,8 +372,15 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
           </div>
         </div>
 
-        {/* Action buttons (Logout) */}
-        <div className="flex items-center space-x-1">
+        {/* Action buttons (Settings & Logout) */}
+        <div className="flex items-center space-x-0.5">
+          <button
+            onClick={() => setAccountSettingsOpen(true)}
+            className="p-1.5 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded transition"
+            title="Ajustes de usuario"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
           <button
             onClick={logout}
             className="p-1.5 text-discord-text-muted hover:text-discord-red hover:bg-discord-hover rounded transition"
@@ -382,6 +395,11 @@ export default function ChannelSidebar({ onChannelSelect, onCloseMobile }) {
       <StartDMModal
         isOpen={startDMOpen}
         onClose={() => setStartDMOpen(false)}
+      />
+
+      <AccountSettingsModal
+        isOpen={accountSettingsOpen}
+        onClose={() => setAccountSettingsOpen(false)}
       />
 
       {activeServer && (

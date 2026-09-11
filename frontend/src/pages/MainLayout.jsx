@@ -6,10 +6,13 @@ import ChatArea from '../components/chat/ChatArea';
 import DirectMessageArea from '../components/chat/DirectMessageArea';
 import MemberSidebar from '../components/members/MemberSidebar';
 import VirtualSessionRoom from '../components/sessions/VirtualSessionRoom';
+import AccountSettingsModal from '../components/modals/AccountSettingsModal';
 import { useServerStore } from '../store/serverStore';
 import { useSessionStore } from '../store/sessionStore';
+import { useAuthStore } from '../store/authStore';
 
 export default function MainLayout() {
+  const user = useAuthStore((state) => state.user);
   const fetchServers = useServerStore((state) => state.fetchServers);
   const activeServer = useServerStore((state) => state.activeServer);
   const isDMView = useServerStore((state) => state.isDMView);
@@ -22,6 +25,7 @@ export default function MainLayout() {
   const [showMembers, setShowMembers] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileMembersOpen, setMobileMembersOpen] = useState(false);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
 
   useEffect(() => {
     fetchServers();
@@ -151,6 +155,22 @@ export default function MainLayout() {
             <span className="text-[10px] mt-0.5">En Reunión</span>
           </button>
         )}
+
+        {/* User Account Settings Shortcut on Mobile */}
+        <button
+          onClick={() => setMobileSettingsOpen(true)}
+          className="flex flex-col items-center justify-center flex-1 py-1 text-discord-text-muted hover:text-white transition"
+          title="Mi Perfil y Ajustes"
+        >
+          <div className="w-5 h-5 rounded-full bg-discord-blurple flex items-center justify-center text-[10px] font-bold text-white overflow-hidden shadow">
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              user?.username?.[0]?.toUpperCase() || 'U'
+            )}
+          </div>
+          <span className="text-[10px] mt-0.5 font-medium">Tú</span>
+        </button>
       </nav>
 
       {/* 6. Virtual Session Call Room (Fullscreen or Minimized Floating PiP) */}
@@ -160,6 +180,12 @@ export default function MainLayout() {
           onLeave={() => leaveActiveSession(activeSession?.id)}
         />
       )}
+
+      {/* 7. Mobile Account Settings Modal */}
+      <AccountSettingsModal
+        isOpen={mobileSettingsOpen}
+        onClose={() => setMobileSettingsOpen(false)}
+      />
     </div>
   );
 }
