@@ -33,24 +33,24 @@ export default function RegisterPage({ onSwitchToLogin }) {
 
   return (
     <div
-      className="min-h-screen w-full flex items-center justify-center p-4 relative bg-[#1a1d36] bg-cover bg-center bg-no-repeat overflow-y-auto select-none"
+      className="h-[100dvh] min-h-[100dvh] w-full flex items-center justify-center p-3 sm:p-4 relative bg-[#1a1d36] bg-cover bg-center bg-no-repeat overflow-y-auto select-none"
       style={{ backgroundImage: "url('/login-bg.svg')" }}
     >
       {/* Subtle dark backdrop overlay */}
       <div className="absolute inset-0 bg-black/20 pointer-events-none" />
 
-      <div className="relative z-10 w-full max-w-[480px] flex flex-col items-center my-6">
-        {/* New Brand Logo at Top */}
-        <div className="mb-6 flex items-center justify-center">
+      <div className="relative z-10 w-full max-w-[460px] flex flex-col items-center my-auto py-2 sm:py-4">
+        {/* Brand Logo at Top */}
+        <div className="mb-4 sm:mb-5 flex items-center justify-center">
           <img
             src="/logo.png"
             alt="MKP Live"
-            className="h-10 sm:h-12 w-auto object-contain drop-shadow-xl"
+            className="h-9 sm:h-11 w-auto object-contain drop-shadow-md"
           />
         </div>
 
         {/* Floating Register Card */}
-        <div className="w-full bg-[#313338] rounded-xl p-6 sm:p-8 shadow-2xl border border-black/20 backdrop-blur-sm select-text">
+        <div className="w-full bg-[#313338] rounded-2xl p-5 sm:p-8 shadow-2xl border border-black/20 backdrop-blur-sm select-text">
           <div className="text-center mb-6 select-none">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               Crear una cuenta en MKP Live
