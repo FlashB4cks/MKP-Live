@@ -536,11 +536,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   </span>
                 </div>
 
-                <div className="sticky bottom-0 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 px-4 py-3 sm:px-6 bg-discord-chat/95 backdrop-blur border-t border-white/10 flex justify-end z-10">
+                <div className="pt-4 pb-2 flex justify-end">
                   <button
                     type="submit"
                     disabled={profileLoading || !username.trim() || !email.trim()}
-                    className="min-h-[42px] bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-6 py-2 rounded-xl transition shadow-lg flex items-center gap-2 active:scale-98 cursor-pointer"
+                    className="min-h-[42px] bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-6 py-2.5 rounded-xl transition shadow-md flex items-center gap-2 active:scale-98 cursor-pointer"
                   >
                     {profileLoading ? 'Guardando...' : 'Guardar Cambios'}
                   </button>
@@ -619,11 +619,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div className="sticky bottom-0 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 px-4 py-3 sm:px-6 bg-discord-chat/95 backdrop-blur border-t border-white/10 flex justify-end z-10">
+                <div className="pt-4 pb-2 flex justify-end">
                   <button
                     type="submit"
                     disabled={securityLoading || !oldPassword || !newPassword || !newPassword2}
-                    className="min-h-[42px] bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-6 py-2 rounded-xl transition shadow-lg active:scale-98 cursor-pointer"
+                    className="min-h-[42px] bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-6 py-2.5 rounded-xl transition shadow-md active:scale-98 cursor-pointer"
                   >
                     {securityLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
                   </button>
