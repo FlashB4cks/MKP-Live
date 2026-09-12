@@ -51,6 +51,7 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
     myPerms.role === 'OWNER';
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
   // Hook WebSocket
@@ -68,10 +69,10 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
     }
   }, [activeChannel?.id, fetchMessages]);
 
-  // Scroll to bottom when new messages arrive
+  // Scroll to bottom when new messages arrive without displacing the header or page
   useEffect(() => {
-    if (!searchQuery) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!searchQuery && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages, searchQuery]);
 
@@ -191,15 +192,16 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
   }
 
   return (
-    <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-text">
-      {/* Channel Header Bar */}
-      <header className="h-12 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
+    <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-text relative">
+      {/* Channel Header Bar - Sticky at top */}
+      <header className="sticky top-0 z-30 bg-discord-chat h-12 sm:h-14 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
         <div className="flex items-center space-x-2 min-w-0 flex-1">
           {/* Mobile Hamburger Menu Button */}
           {onOpenMobileNav && (
             <button
+              type="button"
               onClick={onOpenMobileNav}
-              className="md:hidden p-1.5 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-lg transition"
+              className="md:hidden w-10 h-10 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-xl flex items-center justify-center transition active:scale-95 flex-shrink-0 mr-1"
               title="Abrir canales y servidores"
             >
               <Menu className="w-5 h-5" />
@@ -301,7 +303,7 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
       )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Channel Welcome Banner */}
         {!searchQuery && (
           <div className="mb-6 pt-4">

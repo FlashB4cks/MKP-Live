@@ -57,6 +57,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const optionsMenuRef = useRef(null);
 
@@ -72,10 +73,10 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
     setIsSearchOpen(false);
   }, [activeConversation?.id]);
 
-  // Scroll to bottom when messages update
+  // Scroll to bottom when messages update without displacing header or layout
   useEffect(() => {
-    if (!searchQuery) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!searchQuery && messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   }, [messages, searchQuery]);
 
@@ -315,13 +316,13 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
   return (
     <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-text">
       {/* Header Bar */}
-      <header className="h-12 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
+      <header className="sticky top-0 z-30 bg-discord-chat h-12 sm:h-14 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm select-none">
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
           {/* Mobile Hamburger Menu Button */}
           {onOpenMobileNav && (
             <button
               onClick={onOpenMobileNav}
-              className="md:hidden p-1.5 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-lg transition mr-1"
+              className="md:hidden w-10 h-10 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-xl flex items-center justify-center transition mr-1 active:scale-95"
               title="Abrir mensajes y servidores"
             >
               <Menu className="w-5 h-5" />
@@ -510,7 +511,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Welcome Header */}
         {!searchQuery && (
           <div className="mb-6 pt-4 select-none">

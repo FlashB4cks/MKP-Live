@@ -7,7 +7,6 @@ import MemberSidebar from '../components/members/MemberSidebar';
 import VirtualSessionRoom from '../components/sessions/VirtualSessionRoom';
 import AccountSettingsModal from '../components/modals/AccountSettingsModal';
 import StartDMModal from '../components/modals/StartDMModal';
-import MobileNavDrawer from '../components/navigation/MobileNavDrawer';
 import { useServerStore } from '../store/serverStore';
 import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
@@ -54,14 +53,33 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-discord-chat relative">
-      {/* 1. Left Navigation on Desktop (md+): Server Bar + Channel Bar */}
-      <div className="hidden md:flex h-full flex-shrink-0">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-discord-chat relative">
+      {/* Mobile Drawer Backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden transition-opacity duration-300"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Left Navigation: Server Bar + Channel Bar */}
+      {/* On desktop (md+): static flex layout. On mobile (< md): sliding drawer with smooth transition */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex md:static md:z-auto h-full flex-shrink-0 transition-transform duration-300 ease-in-out md:transform-none select-none ${
+          mobileNavOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* 1. Server Navigation Bar */}
         <ServerSidebar onSelectDM={() => {}} />
-        <ChannelSidebar />
+
+        {/* 2. Channel Navigation & User Profile */}
+        <ChannelSidebar
+          onChannelSelect={() => setMobileNavOpen(false)}
+          onCloseMobile={() => setMobileNavOpen(false)}
+        />
       </div>
 
-      {/* 2. Main Chat View (Server Channel or Direct Messages) */}
+      {/* Main Chat View (Server Channel or Direct Messages) */}
       {showDMs ? (
         <DirectMessageArea onOpenMobileNav={() => setMobileNavOpen(true)} />
       ) : (
@@ -72,7 +90,7 @@ export default function MainLayout() {
         />
       )}
 
-      {/* 3. Server Members List (Only shown when browsing a server) */}
+      {/* Server Members List (Only shown when browsing a server) */}
       {!showDMs && activeServer && (
         <MemberSidebar
           isVisible={showMembers}
@@ -80,21 +98,6 @@ export default function MainLayout() {
           onCloseMobile={() => setMobileMembersOpen(false)}
         />
       )}
-
-      {/* 4. Mobile Lateral Navigation Drawer */}
-      <MobileNavDrawer
-        isOpen={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        onOpenSettings={() => setMobileSettingsOpen(true)}
-        onOpenMembers={() => {
-          if (activeServer) {
-            setMobileMembersOpen(true);
-          } else {
-            useDMStore.getState().openRequestsView();
-          }
-        }}
-        onOpenStartDM={() => setIsStartDMModalOpen(true)}
-      />
 
       {/* 5. Start Direct Message / Add User Modal */}
       <StartDMModal
