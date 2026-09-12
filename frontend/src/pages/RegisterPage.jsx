@@ -45,7 +45,7 @@ export default function RegisterPage({ onSwitchToLogin }) {
           <img
             src="/logo.png"
             alt="MKP Live"
-            className="h-9 sm:h-11 w-auto object-contain drop-shadow-md"
+            className="h-9 sm:h-11 w-auto object-contain"
           />
         </div>
 
