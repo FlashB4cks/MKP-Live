@@ -204,48 +204,68 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
     ).length;
 
     return (
-      <main className="flex-1 bg-discord-chat flex flex-col items-center justify-center p-4 sm:p-6 text-center select-none">
-        {onOpenMobileNav && (
-          <button
-            onClick={onOpenMobileNav}
-            className="md:hidden mb-4 px-4 py-2 bg-discord-blurple text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow"
-          >
-            <Menu className="w-4 h-4" />
-            <span>Ver chats y servidores</span>
-          </button>
-        )}
-        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-discord-blurple/20 border border-discord-blurple/30 flex items-center justify-center mb-4 sm:mb-5 text-discord-blurple shadow-xl">
-          <MessageSquare className="w-8 h-8 sm:w-10 sm:h-10" />
-        </div>
-        <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
-          Mensajes Directos en MKP Live
-        </h2>
-        <p className="text-xs sm:text-sm text-discord-text-muted max-w-md mb-6 leading-relaxed">
-          Comunícate en privado y en tiempo real con cualquier usuario registrado. Busca a un compañero, gestiona tus solicitudes o continúa una conversación.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            onClick={openRequestsView}
-            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-sidebar hover:bg-discord-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2 border border-white/10"
-          >
-            <UserCheck className="w-4 h-4 text-discord-blurple" />
-            <span>Solicitudes de contacto</span>
-            {pendingIncomingCount > 0 && (
-              <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full ml-1">
-                {pendingIncomingCount}
-              </span>
+      <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-none">
+        {/* Mobile Sticky Header with Hamburger Menu Button */}
+        <header className="h-14 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm bg-discord-chat">
+          <div className="flex items-center space-x-2.5">
+            {onOpenMobileNav && (
+              <button
+                onClick={onOpenMobileNav}
+                className="md:hidden w-11 h-11 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-xl flex items-center justify-center transition active:scale-95"
+                title="Abrir menú"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
             )}
-          </button>
+            <div className="flex items-center space-x-2 text-white font-bold text-sm">
+              <MessageSquare className="w-5 h-5 text-discord-blurple" />
+              <span>Mensajes Directos</span>
+            </div>
+          </div>
 
           <button
             onClick={() => setIsModalOpen(true)}
-            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2"
+            className="min-h-[40px] px-3 py-1.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow transition active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>Iniciar nuevo mensaje directo</span>
+            <span className="hidden sm:inline">Nuevo mensaje</span>
           </button>
-        </div>
+        </header>
+
+        {/* Center Content */}
+        <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-4 sm:p-6 text-center">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-discord-blurple/20 border border-discord-blurple/30 flex items-center justify-center mb-4 sm:mb-5 text-discord-blurple shadow-xl">
+            <MessageSquare className="w-8 h-8 sm:w-10 sm:h-10" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+            Mensajes Directos en MKP Live
+          </h2>
+          <p className="text-xs sm:text-sm text-discord-text-muted max-w-md mb-6 leading-relaxed">
+            Comunícate en privado y en tiempo real con cualquier usuario registrado. Busca a un compañero, gestiona tus solicitudes o continúa una conversación.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={openRequestsView}
+              className="min-h-[44px] px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-sidebar hover:bg-discord-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2 border border-white/10 active:scale-98"
+            >
+              <UserCheck className="w-4 h-4 text-discord-blurple" />
+              <span>Solicitudes de contacto</span>
+              {pendingIncomingCount > 0 && (
+                <span className="bg-discord-red text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full ml-1">
+                  {pendingIncomingCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="min-h-[44px] px-4 sm:px-5 py-2 sm:py-2.5 bg-discord-blurple hover:bg-discord-blurple-hover text-white rounded-xl font-semibold text-xs sm:text-sm transition shadow-md flex items-center gap-2 active:scale-98"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Iniciar nuevo mensaje directo</span>
+            </button>
+          </div>
 
         {/* Recent DM list preview */}
         {conversations.length > 0 && (
@@ -287,6 +307,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
         />
+        </div>
       </main>
     );
   }
@@ -597,7 +618,7 @@ export default function DirectMessageArea({ onOpenMobileNav }) {
       </div>
 
       {/* Message Input Box */}
-      <div className="px-2 sm:px-4 pb-16 md:pb-4 flex-shrink-0 select-none">
+      <div className="px-2 sm:px-4 pb-3 sm:pb-4 flex-shrink-0 select-none">
         <form
           onSubmit={handleSendMessage}
           className={`bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner ${

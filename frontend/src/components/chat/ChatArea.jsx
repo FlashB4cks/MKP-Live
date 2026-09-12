@@ -417,7 +417,7 @@ export default function ChatArea({ onToggleMembers, showMembers, onOpenMobileNav
       </div>
 
       {/* Message Input Box */}
-      <div className="px-2 sm:px-4 pb-16 md:pb-4 flex-shrink-0 select-none">
+      <div className="px-2 sm:px-4 pb-3 sm:pb-4 flex-shrink-0 select-none">
         <form
           onSubmit={handleSendMessage}
           className="bg-discord-input rounded-lg px-3 sm:px-4 py-2 sm:py-2.5 flex items-center space-x-2 sm:space-x-3 shadow-inner"

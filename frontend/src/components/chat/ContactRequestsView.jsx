@@ -140,12 +140,12 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
   return (
     <main className="flex-1 bg-discord-chat flex flex-col min-w-0 h-full overflow-hidden select-none">
       {/* Top Header */}
-      <header className="h-12 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm bg-discord-chat">
+      <header className="h-14 border-b border-black/20 px-3 sm:px-4 flex items-center justify-between flex-shrink-0 shadow-sm bg-discord-chat">
         <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
           {onOpenMobileNav && (
             <button
               onClick={onOpenMobileNav}
-              className="md:hidden p-1.5 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-lg transition mr-1"
+              className="md:hidden w-11 h-11 -ml-1 text-discord-text-muted hover:text-white hover:bg-discord-hover rounded-xl flex items-center justify-center transition active:scale-95 mr-1 flex-shrink-0"
               title="Abrir menú"
             >
               <Menu className="w-5 h-5" />
@@ -153,8 +153,8 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
           )}
 
           <div className="flex items-center space-x-2 text-white font-bold text-sm">
-            <Users className="w-5 h-5 text-discord-text-muted" />
-            <span>Solicitudes</span>
+            <Users className="w-5 h-5 text-discord-text-muted flex-shrink-0" />
+            <span className="hidden xs:inline">Solicitudes</span>
           </div>
 
           {/* Vertical Separator */}
@@ -308,13 +308,13 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                         <button
                           onClick={() => handleAccept(conv.id)}
                           disabled={isLoading}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 bg-discord-green hover:bg-discord-green/90 text-white rounded-lg text-xs font-semibold shadow transition disabled:opacity-50"
+                          className="min-h-[44px] flex items-center space-x-1.5 px-3.5 py-2 bg-discord-green hover:bg-discord-green/90 text-white rounded-xl text-xs font-semibold shadow transition disabled:opacity-50 active:scale-95"
                           title="Aceptar solicitud"
                         >
                           {isLoading ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <Loader2 className="w-4 h-4 animate-spin" />
                           ) : (
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-4 h-4" />
                           )}
                           <span className="hidden xs:inline">Aceptar</span>
                         </button>
@@ -322,10 +322,10 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                         <button
                           onClick={() => handleReject(conv.id)}
                           disabled={isLoading}
-                          className="flex items-center space-x-1.5 px-3 py-1.5 bg-discord-sidebar hover:bg-discord-red/80 text-discord-text-muted hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition disabled:opacity-50"
+                          className="min-h-[44px] flex items-center space-x-1.5 px-3.5 py-2 bg-discord-sidebar hover:bg-discord-red/80 text-discord-text-muted hover:text-white rounded-xl text-xs font-semibold border border-white/10 transition disabled:opacity-50 active:scale-95"
                           title="Rechazar solicitud"
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                           <span className="hidden xs:inline">Rechazar</span>
                         </button>
                       </div>
@@ -373,8 +373,8 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                             @{partner.username}
                           </span>
                           <span className="text-xs text-discord-text-muted flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3 text-discord-yellow" />
-                            <span>Solicitud enviada (esperando respuesta)</span>
+                            <Clock className="w-3 h-3 text-discord-yellow flex-shrink-0" />
+                            <span className="truncate">Solicitud enviada (esperando respuesta)</span>
                           </span>
                         </div>
                       </div>
@@ -383,15 +383,15 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                       <button
                         onClick={() => handleCancelOutgoing(conv.id)}
                         disabled={isLoading}
-                        className="flex items-center space-x-1 px-3 py-1.5 bg-discord-sidebar hover:bg-discord-red/80 text-discord-text-muted hover:text-white rounded-lg text-xs font-semibold border border-white/10 transition disabled:opacity-50"
+                        className="min-h-[44px] flex items-center space-x-1.5 px-3.5 py-2 bg-discord-sidebar hover:bg-discord-red/80 text-discord-text-muted hover:text-white rounded-xl text-xs font-semibold border border-white/10 transition disabled:opacity-50 active:scale-95 flex-shrink-0"
                         title="Cancelar solicitud enviada"
                       >
                         {isLoading ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         )}
-                        <span>Cancelar</span>
+                        <span className="hidden xs:inline">Cancelar</span>
                       </button>
                     </div>
                   );
@@ -427,7 +427,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                     <div
                       key={conv.id}
                       onClick={() => selectConversation(conv)}
-                      className="p-3 sm:p-4 flex items-center justify-between hover:bg-white/[0.04] transition cursor-pointer group"
+                      className="p-3 sm:p-4 flex items-center justify-between hover:bg-white/[0.04] transition cursor-pointer group gap-2"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <UserAvatar user={partner} size="md" showOnline={true} />
@@ -438,7 +438,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                               @{partner.username}
                             </span>
                             <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                              className={`text-[10px] px-1.5 py-0.2 rounded font-semibold flex-shrink-0 ${
                                 partner.is_online
                                   ? 'bg-discord-green/20 text-discord-green'
                                   : 'bg-white/5 text-discord-text-muted'
@@ -453,14 +453,14 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                         </div>
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="flex items-center space-x-2 flex-shrink-0">
+                      {/* Action buttons with 44px min area */}
+                      <div className="flex items-center space-x-1.5 flex-shrink-0">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             selectConversation(conv);
                           }}
-                          className="p-2 bg-discord-sidebar hover:bg-discord-blurple text-discord-text-muted hover:text-white rounded-full transition"
+                          className="w-11 h-11 flex items-center justify-center bg-discord-sidebar hover:bg-discord-blurple text-discord-text-muted hover:text-white rounded-xl transition active:scale-95"
                           title="Enviar mensaje directo"
                         >
                           <MessageSquare className="w-4 h-4" />
@@ -471,7 +471,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                             e.stopPropagation();
                             setConversationToDelete(conv);
                           }}
-                          className="p-2 bg-discord-sidebar hover:bg-discord-red text-discord-text-muted hover:text-white rounded-full transition"
+                          className="w-11 h-11 flex items-center justify-center bg-discord-sidebar hover:bg-discord-red text-discord-text-muted hover:text-white rounded-xl transition active:scale-95"
                           title="Eliminar conversación"
                         >
                           <Trash2 className="w-4 h-4" />

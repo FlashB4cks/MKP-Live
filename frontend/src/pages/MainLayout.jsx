@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Compass, Users, Video, Hash } from 'lucide-react';
 import ServerSidebar from '../components/servers/ServerSidebar';
 import ChannelSidebar from '../components/channels/ChannelSidebar';
 import ChatArea from '../components/chat/ChatArea';
@@ -7,11 +6,13 @@ import DirectMessageArea from '../components/chat/DirectMessageArea';
 import MemberSidebar from '../components/members/MemberSidebar';
 import VirtualSessionRoom from '../components/sessions/VirtualSessionRoom';
 import AccountSettingsModal from '../components/modals/AccountSettingsModal';
-import UserAvatar from '../components/common/UserAvatar';
+import StartDMModal from '../components/modals/StartDMModal';
+import MobileNavDrawer from '../components/navigation/MobileNavDrawer';
 import { useServerStore } from '../store/serverStore';
 import { useSessionStore } from '../store/sessionStore';
 import { useAuthStore } from '../store/authStore';
 import { useSocketStore } from '../store/socketStore';
+import { useDMStore } from '../store/dmStore';
 
 export default function MainLayout() {
   const user = useAuthStore((state) => state.user);
@@ -29,6 +30,7 @@ export default function MainLayout() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [mobileMembersOpen, setMobileMembersOpen] = useState(false);
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  const [isStartDMModalOpen, setIsStartDMModalOpen] = useState(false);
 
   useEffect(() => {
     fetchServers();
@@ -53,32 +55,13 @@ export default function MainLayout() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-discord-chat relative">
-      {/* Mobile Left Drawer Backdrop */}
-      {mobileNavOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity"
-          onClick={() => setMobileNavOpen(false)}
-        />
-      )}
-
-      {/* Left Navigation: Server Bar + Channel Bar */}
-      {/* On desktop (md+): flex layout. On mobile: fixed slide-over drawer */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 flex md:static md:z-auto h-full flex-shrink-0 transition-transform duration-300 ease-in-out md:transform-none ${
-          mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        }`}
-      >
-        {/* 1. Server Navigation Bar */}
-        <ServerSidebar onSelectDM={() => setMobileNavOpen(false)} />
-
-        {/* 2. Channel Navigation & User Profile */}
-        <ChannelSidebar
-          onChannelSelect={() => setMobileNavOpen(false)}
-          onCloseMobile={() => setMobileNavOpen(false)}
-        />
+      {/* 1. Left Navigation on Desktop (md+): Server Bar + Channel Bar */}
+      <div className="hidden md:flex h-full flex-shrink-0">
+        <ServerSidebar onSelectDM={() => {}} />
+        <ChannelSidebar />
       </div>
 
-      {/* 3. Main Chat View (Server Channel or Direct Messages) */}
+      {/* 2. Main Chat View (Server Channel or Direct Messages) */}
       {showDMs ? (
         <DirectMessageArea onOpenMobileNav={() => setMobileNavOpen(true)} />
       ) : (
@@ -89,7 +72,7 @@ export default function MainLayout() {
         />
       )}
 
-      {/* 4. Server Members List (Only shown when browsing a server) */}
+      {/* 3. Server Members List (Only shown when browsing a server) */}
       {!showDMs && activeServer && (
         <MemberSidebar
           isVisible={showMembers}
@@ -98,83 +81,26 @@ export default function MainLayout() {
         />
       )}
 
-      {/* 5. Mobile Bottom Navigation Bar (Fixed for Mobile Portrait mode) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 h-14 bg-discord-sidebar border-t border-black/40 flex items-center justify-around px-2 md:hidden select-none">
-        {/* Direct Messages Shortcut */}
-        <button
-          onClick={() => {
-            setDMView();
-            setMobileNavOpen(false);
-          }}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
-            showDMs ? 'text-discord-blurple font-bold' : 'text-discord-text-muted hover:text-white'
-          }`}
-          title="Mensajes Directos"
-        >
-          <MessageSquare className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5 font-medium">Mensajes</span>
-        </button>
+      {/* 4. Mobile Lateral Navigation Drawer */}
+      <MobileNavDrawer
+        isOpen={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        onOpenSettings={() => setMobileSettingsOpen(true)}
+        onOpenMembers={() => {
+          if (activeServer) {
+            setMobileMembersOpen(true);
+          } else {
+            useDMStore.getState().openRequestsView();
+          }
+        }}
+        onOpenStartDM={() => setIsStartDMModalOpen(true)}
+      />
 
-        {/* Servers & Channels Drawer Toggle */}
-        <button
-          onClick={() => setMobileNavOpen(true)}
-          className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
-            !showDMs ? 'text-discord-blurple font-bold' : 'text-discord-text-muted hover:text-white'
-          }`}
-          title="Servidores y Canales"
-        >
-          <Compass className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5 font-medium">Servidores</span>
-        </button>
-
-        {/* Server Members Drawer Toggle (when in server) */}
-        {!showDMs && activeServer ? (
-          <button
-            onClick={() => setMobileMembersOpen(!mobileMembersOpen)}
-            className={`flex flex-col items-center justify-center flex-1 py-1 transition ${
-              mobileMembersOpen ? 'text-discord-blurple font-bold' : 'text-discord-text-muted hover:text-white'
-            }`}
-            title="Integrantes del Servidor"
-          >
-            <Users className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5 font-medium">Integrantes</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => setMobileNavOpen(true)}
-            className="flex flex-col items-center justify-center flex-1 py-1 text-discord-text-muted hover:text-white transition"
-            title="Explorar Canales"
-          >
-            <Hash className="w-5 h-5" />
-            <span className="text-[10px] mt-0.5 font-medium">Explorar</span>
-          </button>
-        )}
-
-        {/* Active Virtual Session Floating Shortcut */}
-        {activeSession && (
-          <button
-            onClick={() => setIsMinimized(false)}
-            className="flex flex-col items-center justify-center flex-1 py-1 text-discord-green font-bold transition"
-            title="Reunión activa - Toca para volver"
-          >
-            <div className="relative">
-              <Video className="w-5 h-5" />
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-discord-green animate-ping" />
-            </div>
-            <span className="text-[10px] mt-0.5">En Reunión</span>
-          </button>
-        )}
-
-        {/* User Account Settings Shortcut on Mobile */}
-        <button
-          onClick={() => setMobileSettingsOpen(true)}
-          className="flex flex-col items-center justify-center flex-1 py-1 text-discord-text-muted hover:text-white transition"
-          title="Mi Perfil y Ajustes"
-        >
-          <UserAvatar user={user} size="xs" className="w-5 h-5" />
-          <span className="text-[10px] mt-0.5 font-medium">Tú</span>
-        </button>
-      </nav>
+      {/* 5. Start Direct Message / Add User Modal */}
+      <StartDMModal
+        isOpen={isStartDMModalOpen}
+        onClose={() => setIsStartDMModalOpen(false)}
+      />
 
       {/* 6. Virtual Session Call Room (Fullscreen or Minimized Floating PiP) */}
       {activeSession && (
@@ -184,7 +110,7 @@ export default function MainLayout() {
         />
       )}
 
-      {/* 7. Mobile Account Settings Modal */}
+      {/* 7. Mobile & Desktop Account Settings Modal */}
       <AccountSettingsModal
         isOpen={mobileSettingsOpen}
         onClose={() => setMobileSettingsOpen(false)}

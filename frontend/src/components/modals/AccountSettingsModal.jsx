@@ -205,33 +205,103 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
         className="w-full max-w-3xl bg-discord-chat border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[92vh] sm:max-h-[85vh] relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Left Sidebar Tabs (Desktop) / Top Tabs (Mobile) */}
-        <div className="w-full md:w-56 bg-discord-sidebar/95 border-b md:border-b-0 md:border-r border-white/10 p-3 sm:p-4 flex flex-row md:flex-col justify-between flex-shrink-0">
-          <div className="space-y-1 w-full flex md:flex-col overflow-x-auto md:overflow-visible gap-1 md:gap-1.5 pb-1 md:pb-0">
-            <div className="flex items-center justify-between px-2 pb-2">
-              <span className="text-[11px] font-bold text-discord-text-muted tracking-wider uppercase">
-                Ajustes de Usuario
-              </span>
-              <button
-                type="button"
-                onClick={onClose}
-                className="md:hidden p-1 rounded-lg text-discord-text-muted hover:text-white hover:bg-white/10 transition"
-                title="Cerrar ajustes"
-              >
-                <X className="w-5 h-5" />
-              </button>
+        {/* 1. Mobile Top Bar: Single clean header with title and 1 close button */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-discord-sidebar border-b border-white/10 flex-shrink-0">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-discord-blurple/20 text-discord-blurple flex items-center justify-center flex-shrink-0">
+              <User className="w-4 h-4" />
             </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-white leading-tight truncate">
+                Ajustes de Usuario
+              </h3>
+              <p className="text-[11px] text-discord-text-muted leading-tight truncate">
+                @{user.username}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-11 h-11 -mr-2 rounded-xl flex items-center justify-center text-discord-text-muted hover:text-white hover:bg-white/10 active:scale-95 transition"
+            title="Cerrar ajustes"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* 2. Mobile Horizontal Pill Tabs */}
+        <div className="md:hidden flex items-center space-x-2 px-3 py-2.5 bg-discord-sidebar/60 border-b border-white/5 overflow-x-auto no-scrollbar flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab('profile')}
+            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'profile'
+                ? 'bg-discord-blurple text-white shadow-sm'
+                : 'text-discord-text hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Mi Perfil</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('security')}
+            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'security'
+                ? 'bg-discord-blurple text-white shadow-sm'
+                : 'text-discord-text hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Seguridad</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('details')}
+            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'details'
+                ? 'bg-discord-blurple text-white shadow-sm'
+                : 'text-discord-text hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>Detalles</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('danger')}
+            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+              activeTab === 'danger'
+                ? 'bg-discord-red text-white shadow-sm'
+                : 'text-discord-red/80 hover:bg-discord-red/10 hover:text-discord-red'
+            }`}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Zona de Peligro</span>
+          </button>
+        </div>
+
+        {/* 3. Desktop Left Sidebar Tabs */}
+        <div className="hidden md:flex w-56 bg-discord-sidebar/95 border-r border-white/10 p-4 flex-col justify-between flex-shrink-0">
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-discord-text-muted tracking-wider uppercase px-2 block mb-2">
+              Ajustes de Usuario
+            </span>
 
             <button
               onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
                 activeTab === 'profile'
                   ? 'bg-discord-blurple text-white shadow-sm'
                   : 'text-discord-text hover:bg-white/5 hover:text-white'
@@ -243,7 +313,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
             <button
               onClick={() => setActiveTab('security')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
                 activeTab === 'security'
                   ? 'bg-discord-blurple text-white shadow-sm'
                   : 'text-discord-text hover:bg-white/5 hover:text-white'
@@ -255,7 +325,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
             <button
               onClick={() => setActiveTab('details')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
                 activeTab === 'details'
                   ? 'bg-discord-blurple text-white shadow-sm'
                   : 'text-discord-text hover:bg-white/5 hover:text-white'
@@ -267,7 +337,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
             <button
               onClick={() => setActiveTab('danger')}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
                 activeTab === 'danger'
                   ? 'bg-discord-red text-white shadow-sm'
                   : 'text-discord-red/80 hover:bg-discord-red/10 hover:text-discord-red'
@@ -278,11 +348,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
             </button>
           </div>
 
-          <div className="hidden md:flex flex-col gap-1.5 pt-4 border-t border-white/10 mt-auto">
+          <div className="flex flex-col gap-1.5 pt-4 border-t border-white/10 mt-auto">
             <button
               type="button"
               onClick={onClose}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-discord-text-muted hover:text-white hover:bg-white/5 transition"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-discord-text-muted hover:text-white hover:bg-white/5 transition"
               title="Cerrar ajustes (Esc)"
             >
               <X className="w-4 h-4" />
@@ -295,7 +365,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 onClose();
                 logout();
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-discord-red hover:bg-discord-red/10 transition"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-discord-red hover:bg-discord-red/10 transition"
             >
               <LogOut className="w-4 h-4" />
               <span>Cerrar Sesión</span>
@@ -303,10 +373,10 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        {/* Right Content Area */}
+        {/* 4. Right Content Area */}
         <div className="flex-1 flex flex-col min-w-0 bg-discord-chat overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-white/10 bg-discord-chat">
+          {/* Header (Desktop only to prevent duplicate headers in mobile) */}
+          <div className="hidden md:flex items-center justify-between p-4 border-b border-white/10 bg-discord-chat">
             <h3 className="text-sm sm:text-base font-bold text-white capitalize">
               {activeTab === 'profile' && 'Editar Perfil'}
               {activeTab === 'security' && 'Seguridad & Contraseña'}
@@ -345,9 +415,9 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                 )}
 
                 {/* Avatar Section */}
-                <div className="flex items-center space-x-4 pb-2 border-b border-white/5">
-                  <div className="relative group">
-                    <div className="w-20 h-20 rounded-full bg-discord-blurple flex items-center justify-center text-3xl font-bold text-white overflow-hidden shadow-xl border-2 border-white/10">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 pb-4 border-b border-white/5 text-center sm:text-left">
+                  <div className="relative group flex-shrink-0">
+                    <div className="w-20 h-20 rounded-2xl sm:rounded-full bg-discord-blurple flex items-center justify-center text-3xl font-bold text-white overflow-hidden shadow-xl border-2 border-white/10">
                       {avatarPreview ? (
                         <img
                           src={getMediaUrl(avatarPreview)}
@@ -363,7 +433,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                     <button
                       type="button"
                       onClick={() => avatarInputRef.current?.click()}
-                      className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                      className="absolute inset-0 bg-black/60 rounded-2xl sm:rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition cursor-pointer"
                       title="Cambiar foto de perfil"
                     >
                       <Camera className="w-5 h-5 mb-0.5" />
@@ -379,13 +449,13 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-2 flex-1 min-w-0">
                     <div className="text-xs font-bold text-white">Foto de Perfil</div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                       <button
                         type="button"
                         onClick={() => avatarInputRef.current?.click()}
-                        className="text-xs bg-white/10 hover:bg-white/15 text-white font-semibold px-3 py-1.5 rounded-lg transition"
+                        className="min-h-[40px] text-xs bg-white/10 hover:bg-white/15 text-white font-semibold px-3.5 py-2 rounded-xl transition active:scale-98"
                       >
                         Subir foto
                       </button>
@@ -393,7 +463,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                         <button
                           type="button"
                           onClick={handleRemoveAvatar}
-                          className="text-xs text-discord-red hover:bg-discord-red/10 px-2.5 py-1.5 rounded-lg transition"
+                          className="min-h-[40px] text-xs text-discord-red hover:bg-discord-red/10 px-3 py-2 rounded-xl transition border border-discord-red/20 active:scale-98"
                         >
                           Quitar foto
                         </button>
@@ -563,43 +633,151 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
             {/* TAB 3: ACCOUNT DETAILS */}
             {activeTab === 'details' && (
-              <div className="space-y-4 text-xs">
-                <div className="bg-discord-sidebar/80 p-4 rounded-xl border border-white/10 space-y-3">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
-                    <span className="text-discord-text-muted">Nombre de usuario:</span>
-                    <span className="font-bold text-white">@{user.username}</span>
+              <div className="space-y-4">
+                {/* User Summary Hero Card */}
+                <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col sm:flex-row items-center sm:items-start gap-3.5 text-center sm:text-left">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-16 h-16 rounded-2xl bg-discord-blurple flex items-center justify-center text-2xl font-black text-white shadow-lg overflow-hidden border-2 border-white/10">
+                      {avatarPreview ? (
+                        <img
+                          src={getMediaUrl(avatarPreview)}
+                          alt=""
+                          onError={() => setAvatarPreview(null)}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        user.username?.[0]?.toUpperCase() || 'U'
+                      )}
+                    </div>
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-discord-green border-2 border-discord-chat flex items-center justify-center" />
                   </div>
-                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
-                    <span className="text-discord-text-muted">Correo electrónico:</span>
-                    <span className="font-bold text-white">{user.email}</span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 justify-center sm:justify-start">
+                      <h4 className="text-base font-bold text-white truncate">
+                        {user.username}
+                      </h4>
+                      <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-discord-blurple/20 text-discord-blurple self-center sm:self-auto">
+                        <Shield className="w-3 h-3" />
+                        {user.is_staff || user.is_superuser ? 'Administrador' : 'Usuario'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-discord-text-muted truncate mt-0.5">
+                      {user.email}
+                    </p>
+                    {user.status_text && (
+                      <p className="text-xs text-discord-green mt-1 italic truncate">
+                        "{user.status_text}"
+                      </p>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
-                    <span className="text-discord-text-muted">Miembro desde:</span>
-                    <span className="font-bold text-white">{memberSince}</span>
-                  </div>
-                  <div className="flex items-center justify-between pb-2.5 border-b border-white/5">
-                    <span className="text-discord-text-muted">Estado de cuenta:</span>
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-discord-green/20 text-discord-green font-semibold text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-discord-green" /> Activa
+                </div>
+
+                {/* Compact Info Grid: Nombre, Correo, Rol y Estado */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Nombre */}
+                  <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
+                      Nombre de Usuario
                     </span>
+                    <div className="text-xs font-bold text-white truncate">
+                      @{user.username}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-discord-text-muted">ID de Usuario:</span>
-                    <div className="flex items-center gap-1.5 font-mono text-[11px] text-discord-text-muted">
-                      <span>{user.id}</span>
+
+                  {/* Correo */}
+                  <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
+                      Correo Electrónico
+                    </span>
+                    <div className="text-xs font-bold text-white break-all">
+                      {user.email}
+                    </div>
+                  </div>
+
+                  {/* Rol */}
+                  <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
+                      Rol en el Sistema
+                    </span>
+                    <div>
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        user.is_staff || user.is_superuser
+                          ? 'bg-discord-blurple/20 text-discord-blurple border border-discord-blurple/30'
+                          : 'bg-white/5 text-discord-text border border-white/10'
+                      }`}>
+                        <Shield className="w-3.5 h-3.5" />
+                        {user.is_staff || user.is_superuser ? 'Administrador' : 'Miembro Estándar'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Estado */}
+                  <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
+                      Estado de la Cuenta
+                    </span>
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-discord-green/20 text-discord-green border border-discord-green/30">
+                        <span className="w-2 h-2 rounded-full bg-discord-green animate-pulse" />
+                        Cuenta Activa
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Miembro Desde */}
+                  <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
+                      Miembro Desde
+                    </span>
+                    <div className="text-xs font-medium text-white">
+                      {memberSince}
+                    </div>
+                  </div>
+
+                  {/* ID de Usuario */}
+                  <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
+                      ID de Cuenta (UUID)
+                    </span>
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-mono text-[11px] text-discord-text-muted truncate">
+                        {user.id}
+                      </span>
                       <button
+                        type="button"
                         onClick={handleCopyId}
-                        className="p-1 hover:text-white rounded hover:bg-white/10 transition"
+                        className="min-w-[40px] min-h-[40px] flex items-center justify-center p-2 hover:text-white rounded-lg hover:bg-white/10 text-discord-text-muted transition flex-shrink-0"
                         title="Copiar ID de usuario"
                       >
                         {copiedId ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-discord-green" />
+                          <CheckCircle2 className="w-4 h-4 text-discord-green" />
                         ) : (
-                          <Copy className="w-3.5 h-3.5" />
+                          <Copy className="w-4 h-4" />
                         )}
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Quick Navigation Actions with Accessible Min Height */}
+                <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('profile')}
+                    className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl bg-discord-blurple hover:bg-discord-blurple-hover text-white text-xs font-semibold flex items-center justify-center gap-2 transition shadow-md active:scale-98"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Editar Información de Perfil</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('security')}
+                    className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-semibold flex items-center justify-center gap-2 border border-white/10 transition active:scale-98"
+                  >
+                    <Lock className="w-4 h-4" />
+                    <span>Cambiar Contraseña</span>
+                  </button>
                 </div>
               </div>
             )}
