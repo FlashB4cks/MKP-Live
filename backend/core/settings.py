@@ -54,9 +54,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -187,7 +187,14 @@ CORS_ALLOWED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.onrender\.com$",
+]
 CORS_ALLOW_CREDENTIALS = True
+
+# Reverse Proxy SSL Configuration (for Render, Cloudflare, Heroku, etc.)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
 
 # CSRF Trusted Origins for HTTPS Production (Render, etc.)
 CSRF_TRUSTED_ORIGINS = [

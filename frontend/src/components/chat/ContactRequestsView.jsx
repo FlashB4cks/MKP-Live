@@ -503,7 +503,7 @@ export default function ContactRequestsView({ onOpenMobileNav }) {
                     setAddUsernameInput(e.target.value);
                     if (addStatus) setAddStatus(null);
                   }}
-                  placeholder="Introduce el nombre de usuario (ej. juan)..."
+                  placeholder="Introduce el nombre de usuario ej. juan..."
                   className="bg-transparent text-xs sm:text-sm text-white placeholder:text-discord-text-muted focus:outline-none flex-1 min-w-0"
                   autoFocus
                 />

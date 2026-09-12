@@ -19,7 +19,10 @@ class UserSerializer(serializers.ModelSerializer):
             url = obj.avatar.url
             request = self.context.get('request')
             if request and not (url.startswith('http://') or url.startswith('https://')):
-                return request.build_absolute_uri(url)
+                abs_url = request.build_absolute_uri(url)
+                if (request.is_secure() or 'onrender.com' in abs_url) and abs_url.startswith('http://'):
+                    abs_url = abs_url.replace('http://', 'https://', 1)
+                return abs_url
             return url
         return None
 

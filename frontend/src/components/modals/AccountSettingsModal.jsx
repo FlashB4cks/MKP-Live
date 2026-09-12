@@ -209,7 +209,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-discord-chat border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[92vh] sm:max-h-[85vh] relative"
+        className="w-full max-w-3xl bg-discord-chat border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-[88dvh] max-h-[88dvh] sm:h-auto sm:max-h-[85vh] relative my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. Mobile Top Bar: Single clean header with title and 1 close button */}
@@ -230,65 +230,65 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="w-11 h-11 -mr-2 rounded-xl flex items-center justify-center text-discord-text-muted hover:text-white hover:bg-white/10 active:scale-95 transition"
+            className="w-10 h-10 -mr-1 rounded-xl flex items-center justify-center text-discord-text-muted hover:text-white hover:bg-white/10 active:scale-95 transition"
             title="Cerrar ajustes"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 2. Mobile Horizontal Pill Tabs */}
-        <div className="md:hidden flex items-center space-x-2 px-3 py-2.5 bg-discord-sidebar/60 border-b border-white/5 overflow-x-auto no-scrollbar flex-shrink-0">
+        {/* 2. Mobile Horizontal Tabs - 4-Column Grid that fits all screens without cutoff */}
+        <div className="md:hidden grid grid-cols-4 gap-1 p-2 bg-discord-sidebar/80 border-b border-white/5 flex-shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`min-h-[38px] flex flex-col xs:flex-row items-center justify-center gap-1 px-1 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'profile'
                 ? 'bg-discord-blurple text-white shadow-sm'
-                : 'text-discord-text hover:bg-white/5 hover:text-white'
+                : 'text-discord-text-muted hover:bg-white/5 hover:text-white'
             }`}
           >
-            <User className="w-3.5 h-3.5" />
-            <span>Mi Perfil</span>
+            <User className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Perfil</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('security')}
-            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`min-h-[38px] flex flex-col xs:flex-row items-center justify-center gap-1 px-1 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'security'
                 ? 'bg-discord-blurple text-white shadow-sm'
-                : 'text-discord-text hover:bg-white/5 hover:text-white'
+                : 'text-discord-text-muted hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Seguridad</span>
+            <Shield className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Seguridad</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('details')}
-            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`min-h-[38px] flex flex-col xs:flex-row items-center justify-center gap-1 px-1 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'details'
                 ? 'bg-discord-blurple text-white shadow-sm'
-                : 'text-discord-text hover:bg-white/5 hover:text-white'
+                : 'text-discord-text-muted hover:bg-white/5 hover:text-white'
             }`}
           >
-            <Info className="w-3.5 h-3.5" />
-            <span>Detalles</span>
+            <Info className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Detalles</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('danger')}
-            className={`min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`min-h-[38px] flex flex-col xs:flex-row items-center justify-center gap-1 px-1 py-1.5 rounded-xl text-[11px] sm:text-xs font-semibold transition-all ${
               activeTab === 'danger'
                 ? 'bg-discord-red text-white shadow-sm'
                 : 'text-discord-red/80 hover:bg-discord-red/10 hover:text-discord-red'
             }`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Zona de Peligro</span>
+            <Trash2 className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Peligro</span>
           </button>
         </div>
 
@@ -353,7 +353,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               type="button"
               onClick={onClose}
               className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-discord-text-muted hover:text-white hover:bg-white/5 transition"
-              title="Cerrar ajustes (Esc)"
+              title="Cerrar ajustes"
             >
               <X className="w-4 h-4" />
               <span>Cerrar Ajustes</span>
@@ -387,7 +387,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
               type="button"
               onClick={onClose}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-discord-text-muted hover:text-white hover:bg-white/10 border border-white/10 hover:border-white/20 transition group"
-              title="Cerrar ajustes (Esc)"
+              title="Cerrar ajustes"
             >
               <span className="text-[11px] font-mono font-medium hidden sm:inline text-discord-text-muted group-hover:text-white">
                 ESC
@@ -521,7 +521,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-discord-text-muted mb-1.5">
-                    Acerca de Mí (Biografía)
+                    Acerca de Mí
                   </label>
                   <textarea
                     value={bio}
@@ -536,11 +536,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   </span>
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                <div className="sticky bottom-0 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 px-4 py-3 sm:px-6 bg-discord-chat/95 backdrop-blur border-t border-white/10 flex justify-end z-10">
                   <button
                     type="submit"
                     disabled={profileLoading || !username.trim() || !email.trim()}
-                    className="bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-lg transition shadow-md flex items-center gap-2"
+                    className="min-h-[42px] bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-6 py-2 rounded-xl transition shadow-lg flex items-center gap-2 active:scale-98 cursor-pointer"
                   >
                     {profileLoading ? 'Guardando...' : 'Guardar Cambios'}
                   </button>
@@ -619,11 +619,11 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                <div className="pt-2 flex justify-end">
+                <div className="sticky bottom-0 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 px-4 py-3 sm:px-6 bg-discord-chat/95 backdrop-blur border-t border-white/10 flex justify-end z-10">
                   <button
                     type="submit"
                     disabled={securityLoading || !oldPassword || !newPassword || !newPassword2}
-                    className="bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-5 py-2 rounded-lg transition shadow-md"
+                    className="min-h-[42px] bg-discord-blurple hover:bg-discord-blurple-hover disabled:opacity-50 text-white text-xs sm:text-sm font-semibold px-6 py-2 rounded-xl transition shadow-lg active:scale-98 cursor-pointer"
                   >
                     {securityLoading ? 'Actualizando...' : 'Actualizar Contraseña'}
                   </button>
@@ -738,7 +738,7 @@ export default function AccountSettingsModal({ isOpen, onClose }) {
                   {/* ID de Usuario */}
                   <div className="p-3.5 rounded-xl bg-discord-sidebar/70 border border-white/5 space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-discord-text-muted block">
-                      ID de Cuenta (UUID)
+                      ID de Cuenta
                     </span>
                     <div className="flex items-center justify-between gap-1">
                       <span className="font-mono text-[11px] text-discord-text-muted truncate">
